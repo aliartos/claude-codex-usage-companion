@@ -22,6 +22,11 @@ public sealed record CompanionSettings
         SystemLanguageOptions.ResolveDefault(
             System.Globalization.CultureInfo.CurrentUICulture);
     public string Theme { get; init; } = UiThemeOptions.System;
+    public double FontScale { get; init; } = OverlayLayoutOptions.DefaultFontScale;
+    public double ClaudeSessionCardHeight { get; init; } = OverlayLayoutOptions.FiveHourCardHeight;
+    public double ClaudeWeeklyCardHeight { get; init; } = OverlayLayoutOptions.WeeklyCardHeight;
+    public double CodexFiveHourCardHeight { get; init; } = OverlayLayoutOptions.FiveHourCardHeight;
+    public double CodexWeeklyCardHeight { get; init; } = OverlayLayoutOptions.WeeklyCardHeight;
     public bool EnableLowUsageAlert { get; init; }
     public int LowUsageAlertThresholdPercent { get; init; } =
         UsageAlertOptions.DefaultThresholdPercent;
@@ -30,6 +35,8 @@ public sealed record CompanionSettings
     public string UsageLogFilePath { get; init; } = UsageLogOptions.DefaultFilePath();
     public string UsageLogFormat { get; init; } = UsageLogOptions.Csv;
     public string Position { get; init; } = WindowPosition.RightBottom;
+    public int? CustomPositionX { get; init; }
+    public int? CustomPositionY { get; init; }
     public double Opacity { get; init; } = 1d;
     public int Margin { get; init; } = 16;
     public bool AlwaysOnTop { get; init; } = true;

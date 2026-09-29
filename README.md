@@ -30,7 +30,7 @@ This Linux port is based on [gkfriend/codex-usage-companion](https://github.com/
 ## Requirements
 
 - Kubuntu 26.04 or another modern x64/ARM64 Linux distribution.
-- X11 or an XWayland-capable Wayland desktop (the default on Kubuntu).
+- A Wayland desktop or an X11 session.
 - Codex CLI installed, authenticated, and available as `codex` on `PATH`.
 - For the `.deb`: `libx11-6`, `libice6`, `libsm6`, `libfontconfig1`, `libharfbuzz0b`, `fonts-noto-cjk`, and `libnotify-bin`.
 
@@ -74,7 +74,7 @@ Claude Code has no official API for this, unlike Codex. The companion reads the 
 Build or download the `.deb`, then:
 
 ```bash
-sudo apt install ./claude-codex-usage-companion_0.1.2_amd64.deb
+sudo apt install ./claude-codex-usage-companion_0.1.3_amd64.deb
 ```
 
 Launch **Claude Codex Usage Companion** from KDE's application menu, or run:
@@ -100,7 +100,7 @@ The panel indicator shows separate progress values for Claude's current session 
 Release builds also include a standalone `.plasmoid` package. Install one without root access with:
 
 ```bash
-kpackagetool6 --type Plasma/Applet --install ./claude-codex-usage-companion-0.1.2.plasmoid
+kpackagetool6 --type Plasma/Applet --install ./claude-codex-usage-companion-0.1.3.plasmoid
 ```
 
 For a development checkout, install or update the current source package with `bash scripts/install-plasma-widget.sh`. The companion CLI must remain installed and available on `PATH`.
@@ -137,7 +137,7 @@ Set `CODEX_CLI_PATH=/absolute/path/to/codex` if Codex is not on `PATH`. Set `NO_
 
 ## Install as a Codex plugin
 
-The Linux release build creates `CodexUsageCompanionMarketplace-v0.1.2-linux-x64.zip`. Extract it, add the extracted marketplace, then install and enable the plugin:
+The Linux release build creates `CodexUsageCompanionMarketplace-v0.1.3-linux-x64.zip`. Extract it, add the extracted marketplace, then install and enable the plugin:
 
 ```bash
 codex plugin marketplace add /path/to/extracted-marketplace
@@ -190,9 +190,10 @@ Theme values: `dark`, `light`, and `system`. `system` is the default and follows
 
 Tray icon style values are `original`, `claude-current-session`, `claude-weekly-session`, and `codex-session`. Numeric styles show bold, anti-aliased seven-segment digits without a percent sign on a dark background. Codex session uses the five-hour window when available and falls back to weekly usage otherwise.
 
-Position values: `left-top`, `middle-top`, `right-top`, `left-center`, `middle-center`, `right-center`, `left-bottom`, `middle-bottom`, `right-bottom`.
+Position values: `left-top`, `middle-top`, `right-top`, `left-center`, `middle-center`, `right-center`, `left-bottom`, `middle-bottom`, `right-bottom`, `custom`.
 
 Selecting a position previews it immediately. **OK** or **Apply** keeps the new position; **Cancel** restores the most recently applied position. Legacy corner values such as `top-left` and `bottom-right` remain accepted.
+Drag the header to move the window freely; the position switches to `custom` and the coordinates are saved. Selecting `custom` in Settings restores the saved location, or keeps the current location if none has been saved yet.
 
 Keyboard shortcuts are available throughout the GUI. In the main window, press `F1` to list the shortcuts, `S` to open Settings, `Ctrl+R` to refresh usage, or `Esc` to close the window. The header's **?** button and the tray menu's **Keyboard shortcuts** item open the same list, which closes with `Esc`, `F1`, or **OK**. In Settings, press `Ctrl+S` to save or `Esc` to close. Closing Settings with unsaved changes asks for confirmation before discarding them.
 
@@ -241,7 +242,9 @@ dotnet run --project src/CodexUsageCompanion -- gui
 
 The GUI uses an owner-only Unix socket under `XDG_RUNTIME_DIR` to enforce one instance and accept refresh signals. Settings follow the XDG config convention; bounded logs are stored under `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-usage-companion`.
 
-Avalonia uses X11/XWayland by default on Linux. A Wayland compositor may apply its own window-positioning or always-on-top policy. The panel remains draggable and includes keyboard shortcuts, pin (always-on-top), settings, refresh, minimize, and close controls, in that order, with the two window controls set apart by a wider gap. The header's pin toggle, the Settings window's **Keep window always on top** checkbox, and the tray menu's **Keep window always on top** checkbox all reflect and update the same setting. The Claude **Current session**/**Current week (All)** section appears first, followed by the Codex section. Purchased **Credits** appear below the Codex weekly usage bar with exactly two decimal places as `Credits: 23.75, Automatic reload: Enabled/Disabled`; missing automatic-reload state is displayed as `Disabled`. Claude's weekly card shows `Usage credits: 6.32 / 100.00, Auto-reload: Enabled/Disabled` reflecting its optional pay-as-you-go extra usage credits (amount spent against the monthly cap, not a prepaid balance). Each card title shows its provider's own icon (the Claude mark or the OpenAI mark). The system tray is disabled by default: closing the panel exits the resident process. When the tray is enabled, closing hides the panel while preserving its latest usage snapshot; background interval updates and Codex rate-limit notifications continue while hidden. Clicking the tray icon, choosing **Show window**, or launching the app again restores the cached state without an immediate refetch. The tray menu contains **Show window**, **Refresh usage**, **Keep window always on top**, **Start automatically when I sign in**, **Settings**, **Keyboard shortcuts**, and **Quit**, with separators between action groups. Choose **Quit** to stop the process. The tray tooltip shows the app name, then one line per usage window — `[Claude] Current: d% remaining (Resets at ...)`, `[Claude] Weekly: d% remaining (Resets at ...)`, and `[Codex] Weekly: d% remaining (Resets at ...)` — followed by `Last updated at HH:mm` using the selected last-updated date/time format.
+On a Wayland desktop with XWayland available, the app uses Avalonia's X11 compatibility backend so the selected window position controls startup placement and later position changes. With native Wayland only, the compositor controls placement and may ignore this setting. X11 sessions use the X11 backend. Drag the header to move the panel, or drag its lower-right corner to resize it; cards and usage bars adapt to the width, and shorter windows scroll. The panel remains draggable and includes keyboard shortcuts, pin (always-on-top), settings, refresh, minimize, and close controls, in that order, with the two window controls set apart by a wider gap. The header's pin toggle, the Settings window's **Keep window always on top** checkbox, and the tray menu's **Keep window always on top** checkbox all reflect and update the same setting. The Claude **Current session**/**Current week (All)** section appears first, followed by the Codex section. Purchased **Credits** appear below the Codex weekly usage bar with exactly two decimal places as `Credits: 23.75, Automatic reload: Enabled/Disabled`; missing automatic-reload state is displayed as `Disabled`. Claude's weekly card shows `Usage credits: 6.32 / 100.00, Auto-reload: Enabled/Disabled` reflecting its optional pay-as-you-go extra usage credits (amount spent against the monthly cap, not a prepaid balance). Each card title shows its provider's own icon (the Claude mark or the OpenAI mark). The system tray is disabled by default: closing the panel exits the resident process. When the tray is enabled, closing hides the panel while preserving its latest usage snapshot; background interval updates and Codex rate-limit notifications continue while hidden. Clicking the tray icon, choosing **Show window**, or launching the app again restores the cached state and its last on-screen position without an immediate refetch. The tray menu contains **Show window**, **Refresh usage**, **Keep window always on top**, **Start automatically when I sign in**, **Settings**, **Keyboard shortcuts**, and **Quit**, with separators between action groups. Choose **Quit** to stop the process. The tray tooltip shows the app name, then one line per usage window — `[Claude] Current: d% remaining (Resets at ...)`, `[Claude] Weekly: d% remaining (Resets at ...)`, and `[Codex] Weekly: d% remaining (Resets at ...)` — followed by `Last updated at HH:mm` using the selected last-updated date/time format.
+
+Drag the small handle at the bottom of a usage card to change that card's height; the height is saved automatically. The handle also accepts Up/Down keys when focused. In **Settings → Appearance**, drag **Panel font size** (80–150%) to preview text, then choose **Apply** or **OK** to save it. The lower-right window resize mark appears on hover.
 
 The app reads `account/rateLimits/read` from a local `codex app-server` process. This API may evolve, so future Codex releases can require compatibility changes. Claude usage relies on an undocumented Anthropic endpoint (see [Enable Claude usage (optional)](#enable-claude-usage-optional)) that could change without notice.
 

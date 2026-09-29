@@ -326,6 +326,27 @@ public sealed record UiText(
         _ => "Appearance"
     };
 
+    public string FontSizeOption => Language switch
+    {
+        UiLanguage.TraditionalChinese => "面板字體大小",
+        UiLanguage.SimplifiedChinese => "面板字体大小",
+        _ => "Panel font size"
+    };
+
+    public string FontSizePreview => Language switch
+    {
+        UiLanguage.TraditionalChinese => "預覽：目前工作階段 · 剩餘 78%",
+        UiLanguage.SimplifiedChinese => "预览：当前会话 · 剩余 78%",
+        _ => "Preview: Current session · 78% remaining"
+    };
+
+    public string FormatResizeCardHint(string title) => Language switch
+    {
+        UiLanguage.TraditionalChinese => $"調整 {title} 卡片高度（向上／向下鍵）",
+        UiLanguage.SimplifiedChinese => $"调整{title}卡片高度（上／下方向键）",
+        _ => $"Resize {title} card (Up/Down keys)"
+    };
+
     public string NotificationSettingsGroup => Language switch
     {
         UiLanguage.TraditionalChinese => "通知",

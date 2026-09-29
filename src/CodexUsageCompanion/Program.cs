@@ -44,14 +44,28 @@ public static class Program
         };
     }
 
-    public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>()
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        var builder = AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .With(new X11PlatformOptions
             {
                 EnableSessionManagement = false
-            })
-            .LogToTrace();
+            });
+
+        if (OperatingSystem.IsLinux() && ShouldUseNativeWayland(
+                Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"),
+                Environment.GetEnvironmentVariable("DISPLAY")))
+        {
+            builder = builder.UseWayland();
+        }
+
+        return builder.LogToTrace();
+    }
+
+    internal static bool ShouldUseNativeWayland(string? waylandDisplay, string? xDisplay) =>
+        !string.IsNullOrWhiteSpace(waylandDisplay) &&
+        string.IsNullOrWhiteSpace(xDisplay);
 
     private static void ConfigureLinuxHarfBuzz()
     {

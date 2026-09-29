@@ -30,6 +30,9 @@ public sealed class CompanionSettingsTests
                     System.Globalization.CultureInfo.CurrentUICulture),
                 settings.Language);
             Assert.Equal(UiThemeOptions.System, settings.Theme);
+            Assert.Equal(1d, settings.FontScale);
+            Assert.Equal(78d, settings.ClaudeSessionCardHeight);
+            Assert.Equal(96d, settings.ClaudeWeeklyCardHeight);
             Assert.False(settings.EnableLowUsageAlert);
             Assert.Equal(
                 UsageAlertOptions.DefaultThresholdPercent,
@@ -149,6 +152,38 @@ public sealed class CompanionSettingsTests
             var json = File.ReadAllText(path);
             Assert.Contains("\"showCodexFiveHour\": true", json);
             Assert.DoesNotContain("\"showFiveHourLimit\"", json);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void SaveAndLoadPreserveFontScaleAndCardHeightsWithinBounds()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"CodexUsageCompanion.Tests.{Guid.NewGuid():N}");
+        var path = Path.Combine(directory, "settings.json");
+        try
+        {
+            CompanionSettingsStore.Save(new CompanionSettings
+            {
+                FontScale = 1.25,
+                ClaudeSessionCardHeight = 130,
+                ClaudeWeeklyCardHeight = 180,
+                CodexFiveHourCardHeight = 999,
+                CodexWeeklyCardHeight = 20
+            }, path);
+
+            var loaded = CompanionSettingsStore.Load(path);
+            Assert.Equal(1.25, loaded.FontScale);
+            Assert.Equal(130, loaded.ClaudeSessionCardHeight);
+            Assert.Equal(180, loaded.ClaudeWeeklyCardHeight);
+            Assert.Equal(OverlayLayoutOptions.MaximumCardHeight, loaded.CodexFiveHourCardHeight);
+            Assert.Equal(OverlayLayoutOptions.WeeklyCardHeight, loaded.CodexWeeklyCardHeight);
         }
         finally
         {
@@ -348,12 +383,41 @@ public sealed class CompanionSettingsTests
     [InlineData("left-bottom", WindowPosition.LeftBottom)]
     [InlineData("middle-bottom", WindowPosition.MiddleBottom)]
     [InlineData("right-bottom", WindowPosition.RightBottom)]
+    [InlineData("custom", WindowPosition.Custom)]
     [InlineData("top-left", WindowPosition.LeftTop)]
     [InlineData("bottom-right", WindowPosition.RightBottom)]
     [InlineData("invalid", WindowPosition.RightBottom)]
     public void WindowPositionNormalizesCurrentAndLegacyValues(string value, string expected)
     {
         Assert.Equal(expected, WindowPosition.Normalize(value));
+    }
+
+    [Fact]
+    public void CustomWindowPositionCoordinatesRoundTrip()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"CodexUsageCompanion.Tests.{Guid.NewGuid():N}");
+        var path = Path.Combine(directory, "settings.json");
+        try
+        {
+            CompanionSettingsStore.Save(new CompanionSettings
+            {
+                Position = WindowPosition.Custom,
+                CustomPositionX = -125,
+                CustomPositionY = 280
+            }, path);
+
+            var loaded = CompanionSettingsStore.Load(path);
+            Assert.Equal(WindowPosition.Custom, loaded.Position);
+            Assert.Equal(-125, loaded.CustomPositionX);
+            Assert.Equal(280, loaded.CustomPositionY);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, true);
+            }
+        }
     }
 
     [Theory]

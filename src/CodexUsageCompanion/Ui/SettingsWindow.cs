@@ -1,5 +1,6 @@
 using System.Reflection;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -33,6 +34,9 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox _usageLogging;
     private readonly ComboBox _language;
     private readonly ComboBox _theme;
+    private readonly Slider _fontSizeSlider;
+    private readonly TextBlock _fontSizeValue;
+    private readonly TextBlock _fontSizePreview;
     private readonly ComboBox _position;
     private readonly ComboBox _updateInterval;
     private readonly ComboBox _resetDateTimeFormat;
@@ -203,6 +207,32 @@ public sealed class SettingsWindow : Window
             SelectedItem = themes.First(choice => choice.Value == selectedTheme),
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
+        _fontSizeSlider = new Slider
+        {
+            Minimum = OverlayLayoutOptions.MinimumFontScale * 100,
+            Maximum = OverlayLayoutOptions.MaximumFontScale * 100,
+            Value = OverlayLayoutOptions.NormalizeFontScale(settings.FontScale) * 100,
+            TickFrequency = 5,
+            IsSnapToTickEnabled = true,
+            SmallChange = 5,
+            LargeChange = 10,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        AutomationProperties.SetName(_fontSizeSlider, text.FontSizeOption);
+        _fontSizeValue = new TextBlock
+        {
+            Width = 48,
+            TextAlignment = TextAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _fontSizePreview = new TextBlock
+        {
+            Text = text.FontSizePreview,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(8)
+        };
+        _fontSizeSlider.ValueChanged += (_, _) => UpdateFontSizePreview();
+        UpdateFontSizePreview();
         _position = new ComboBox
         {
             ItemsSource = WindowPosition.Values,
@@ -311,6 +341,25 @@ public sealed class SettingsWindow : Window
         {
             Text = text.ThemeOption,
             Margin = new Thickness(0, 8, 0, 4)
+        };
+        var fontSizeLabel = new TextBlock
+        {
+            Text = text.FontSizeOption,
+            Margin = new Thickness(0, 8, 0, 4)
+        };
+        var fontSizeControls = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto")
+        };
+        Grid.SetColumn(_fontSizeValue, 1);
+        fontSizeControls.Children.Add(_fontSizeSlider);
+        fontSizeControls.Children.Add(_fontSizeValue);
+        var fontSizePreviewBorder = new Border
+        {
+            BorderBrush = Brushes.Gray,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Child = _fontSizePreview
         };
         var usageLogFilePathLabel = new TextBlock
         {
@@ -436,6 +485,9 @@ public sealed class SettingsWindow : Window
                 _language,
                 themeLabel,
                 _theme,
+                fontSizeLabel,
+                fontSizeControls,
+                fontSizePreviewBorder,
                 positionLabel,
                 _position,
                 CreateSeparator(),
@@ -657,6 +709,7 @@ public sealed class SettingsWindow : Window
             ShowCodexWeekly = _showCodexWeekly.IsChecked == true,
             Language = (_language.SelectedItem as LanguageChoice)?.Value ?? "en-US",
             Theme = (_theme.SelectedItem as ThemeChoice)?.Value ?? UiThemeOptions.System,
+            FontScale = OverlayLayoutOptions.NormalizeFontScale(_fontSizeSlider.Value / 100),
             Position = _position.SelectedItem as string ?? WindowPosition.RightBottom,
             RefreshIntervalSeconds =
                 (_updateInterval.SelectedItem as UpdateIntervalChoice)?.Seconds ??
@@ -673,6 +726,13 @@ public sealed class SettingsWindow : Window
             UsageLogFormat =
                 _usageLogFormat.SelectedItem as string ?? UsageLogOptions.Csv
         };
+    }
+
+    private void UpdateFontSizePreview()
+    {
+        var scale = OverlayLayoutOptions.NormalizeFontScale(_fontSizeSlider.Value / 100);
+        _fontSizeValue.Text = $"{scale * 100:0}%";
+        _fontSizePreview.FontSize = 14 * scale;
     }
 
     private void UpdateUsageLoggingControls()

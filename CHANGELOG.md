@@ -4,14 +4,25 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.3] - Pending release
+
+### Added
+
+- Window movement and resizing on Wayland desktops, per-card vertical resizing, and a font-size slider with preview.
+- A `custom` window position that saves coordinates after dragging the app window and restores them at launch.
 
 ### Fixed
 
+- Skip Avalonia XAML compilation for the C#-only UI, avoiding an intermittent build-time DLL lock.
+- Restore reliable tray registration by waiting until Avalonia exports the StatusNotifierItem before installing the tooltip bridge.
+- Apply the selected window position at startup and on settings changes through XWayland when available; use the primary monitor bounds for correct placement on mixed-size displays.
+- Restore the last on-screen position after hiding the window to the tray.
+- Restrict replacement Claude credentials files to owner access during token refresh.
 - Claude usage no longer stalls at "Waiting for usage data" after a login autostart. The stored OAuth access token expires after a few hours and the Claude CLI renews it only while the CLI itself runs, so following a reboot the companion was reading an expired token and reporting "Claude session expired" until the user happened to open Claude Code. It now renews the token itself through the same OAuth refresh grant the CLI uses, and also retries once when the server rejects a token that has not reached its recorded expiry.
 
 ### Changed
 
+- Updated Avalonia dependencies to 12.1.3 and synchronized application, plugin, widget, and release artifact versions.
 - The companion now writes to `~/.claude/.credentials.json` when it renews a token. The write is atomic, stays owner-readable only, preserves every field the app does not own, and takes the same lock file the Claude CLI uses so the two never rotate the refresh token at once. Tokens are still never logged.
 
 ## [0.1.2] - 2026-08-10

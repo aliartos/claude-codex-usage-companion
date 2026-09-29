@@ -18,8 +18,7 @@ public static class ClaudeCredentialsWriter
         var root = ReadRoot(credentialsPath);
         if (root["claudeAiOauth"] is not JsonObject oauth)
         {
-            oauth = new JsonObject();
-            root["claudeAiOauth"] = oauth;
+            throw new ClaudeCredentialsFormatException("Unable to parse Claude credentials file.");
         }
 
         oauth["accessToken"] = tokens.AccessToken;
@@ -44,12 +43,12 @@ public static class ClaudeCredentialsWriter
     {
         try
         {
-            return JsonNode.Parse(File.ReadAllText(credentialsPath)) as JsonObject ?? new JsonObject();
+            return JsonNode.Parse(File.ReadAllText(credentialsPath)) as JsonObject ??
+                throw new ClaudeCredentialsFormatException("Unable to parse Claude credentials file.");
         }
-        catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or JsonException)
+        catch (JsonException)
         {
-            return new JsonObject();
+            throw new ClaudeCredentialsFormatException("Unable to parse Claude credentials file.");
         }
     }
 
@@ -64,12 +63,12 @@ public static class ClaudeCredentialsWriter
         Directory.CreateDirectory(directory);
         var temporaryPath = Path.Combine(
             directory,
-            $".{Path.GetFileName(credentialsPath)}.{Environment.ProcessId}.tmp");
+            $".{Path.GetFileName(credentialsPath)}.{Guid.NewGuid():N}.tmp");
         try
         {
             using (var stream = new FileStream(
                 temporaryPath,
-                FileMode.Create,
+                FileMode.CreateNew,
                 FileAccess.Write,
                 FileShare.None))
             {

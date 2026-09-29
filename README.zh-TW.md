@@ -30,7 +30,7 @@ Claude Codex Usage Companion 是一套在 Linux 上執行的本機開源 Claude 
 ## 系統需求
 
 - Kubuntu 26.04 或其他新式 x64/ARM64 Linux 發行版。
-- X11 或支援 XWayland 的 Wayland 桌面環境（Kubuntu 預設支援）。
+- Wayland 桌面環境或 X11 工作階段。
 - 已安裝並完成驗證的 Codex CLI，且可透過 `PATH` 中的 `codex` 執行。
 - `.deb` 套件需要：`libx11-6`、`libice6`、`libsm6`、`libfontconfig1`、`libharfbuzz0b`、`fonts-noto-cjk` 與 `libnotify-bin`。
 
@@ -74,7 +74,7 @@ Claude Code 並沒有官方 API 可供查詢用量，這點與 Codex 不同。�
 建置或下載 `.deb`，然後執行：
 
 ```bash
-sudo apt install ./claude-codex-usage-companion_0.1.2_amd64.deb
+sudo apt install ./claude-codex-usage-companion_0.1.3_amd64.deb
 ```
 
 從 KDE 應用程式選單啟動 **Claude Codex Usage Companion**，或執行：
@@ -100,7 +100,7 @@ claude-codex-usage-companion gui
 Release 建置也會包含獨立的 `.plasmoid` 套件，可不使用 root 安裝：
 
 ```bash
-kpackagetool6 --type Plasma/Applet --install ./claude-codex-usage-companion-0.1.2.plasmoid
+kpackagetool6 --type Plasma/Applet --install ./claude-codex-usage-companion-0.1.3.plasmoid
 ```
 
 若使用開發 checkout，可執行 `bash scripts/install-plasma-widget.sh` 安裝或更新目前的原始碼套件。Companion CLI 必須維持安裝，並可從 `PATH` 執行。
@@ -137,7 +137,7 @@ claude-codex-usage config
 
 ## 安裝為 Codex plugin
 
-Linux release 建置會產生 `CodexUsageCompanionMarketplace-v0.1.2-linux-x64.zip`。解壓縮後，加入解壓縮的 marketplace，然後安裝並啟用 plugin：
+Linux release 建置會產生 `CodexUsageCompanionMarketplace-v0.1.3-linux-x64.zip`。解壓縮後，加入解壓縮的 marketplace，然後安裝並啟用 plugin：
 
 ```bash
 codex plugin marketplace add /path/to/extracted-marketplace
@@ -190,9 +190,10 @@ ${XDG_CONFIG_HOME:-$HOME/.config}/claude-codex-usage-companion/settings.json
 
 系統匣圖示樣式值為 `original`、`claude-current-session`、`claude-weekly-session` 與 `codex-session`。數字樣式會在深色背景上顯示粗體、反鋸齒的七段顯示器數字，且不顯示百分比符號。Codex 工作階段會優先使用 5 小時視窗，若未提供則改用每週用量。
 
-位置值：`left-top`、`middle-top`、`right-top`、`left-center`、`middle-center`、`right-center`、`left-bottom`、`middle-bottom`、`right-bottom`。
+位置值：`left-top`、`middle-top`、`right-top`、`left-center`、`middle-center`、`right-center`、`left-bottom`、`middle-bottom`、`right-bottom`、`custom`。
 
 選擇位置後會立即預覽。按下 **確定** 或 **應用** 會保留新位置；按下 **取消** 會還原至最近一次套用的位置。程式仍接受 `top-left` 與 `bottom-right` 等舊版角落位置值。
+拖曳標題列可自由移動視窗；位置會切換為 `custom` 並儲存座標。在設定中選擇 `custom` 會還原已儲存的位置；若尚未儲存，則保留目前位置。
 
 GUI 全域提供鍵盤快捷鍵。在主視窗中，按 `F1` 列出所有快捷鍵、按 `S` 開啟設定、按 `Ctrl+R` 重新整理用量，或按 `Esc` 關閉視窗。標題列的 **?** 按鈕與系統匣選單的**鍵盤快捷鍵**會開啟同一份清單，可按 `Esc`、`F1` 或 **確定** 關閉。在設定視窗中，按 `Ctrl+S` 儲存，或按 `Esc` 關閉。若關閉設定時仍有未儲存的變更，程式會先要求確認，避免直接捨棄變更。
 
@@ -241,7 +242,9 @@ dotnet run --project src/CodexUsageCompanion -- gui
 
 GUI 使用 `XDG_RUNTIME_DIR` 下僅限擁有者存取的 Unix socket，以確保只執行一個實例並接收重新整理訊號。設定遵循 XDG config 慣例；有限大小的記錄檔儲存在 `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-usage-companion`。
 
-Avalonia 在 Linux 上預設使用 X11/XWayland。Wayland compositor 可能會套用自己的視窗定位或永遠置頂政策。面板仍可拖曳，並依序包含鍵盤快捷鍵、釘選置頂、設定、重新整理、最小化與關閉控制項，其中最小化與關閉兩個視窗控制項會以較寬的間距分隔。標題列的釘選按鈕、設定視窗的「視窗永遠置頂」核取方塊，以及系統匣選單的「視窗永遠置頂」核取方塊都會反映並更新同一項設定。Claude 的**目前工作階段**／**本週用量（全部）**區塊會顯示在最前面，其後才是 Codex 區塊。已購買的**點數**會顯示在 Codex 每週用量條下方，固定保留兩位小數，格式為 `點數：23.75, 自動儲值：已啟用/已停用`；未提供自動儲值狀態時會顯示為`已停用`。Claude 的每週卡片會顯示 `使用點數：6.32 / 100.00, 自動加購：已啟用/已停用`，反映其選用的按量加購額度（已花費金額對比每月上限，而非預付餘額）。每張卡片標題會顯示對應供應商自己的圖示（Claude 標誌或 OpenAI 標誌）。系統匣預設為停用：關閉面板會結束常駐程序。啟用系統匣後，關閉會隱藏面板並保留最新用量快照；隱藏期間仍會依更新間隔在背景更新，並接收 Codex 用量限制通知。按一下系統匣圖示、選擇 **顯示視窗**，或再次啟動程式時，會還原快取狀態而不立即重新擷取。系統匣選單包含**顯示視窗**、**重新整理使用量**、**視窗永遠置頂**、**開機時自動啟動**、**設定**、**鍵盤快捷鍵**與**結束**，並以分隔線區分操作群組。選擇 **結束** 才會停止程序。系統匣提示會先顯示應用程式名稱，接著每個用量視窗各佔一行，格式為 `[Claude] 目前: 剩餘 d% (於 ... 重置)`、`[Claude] 每週: 剩餘 d% (於 ... 重置)`、`[Codex] 每週: 剩餘 d% (於 ... 重置)`，最後是使用所選最後更新日期時間格式的 `最後更新於 HH:mm`。
+在提供 XWayland 的 Wayland 桌面中，程式使用 Avalonia 的 X11 相容後端，讓選取的視窗位置決定啟動位置，並能在變更設定後移動視窗。若只有原生 Wayland，合成器會控制視窗位置，並可能忽略此設定。X11 工作階段使用 X11 後端。拖曳標題列可移動面板，拖曳右下角可調整大小；卡片與用量條會隨寬度調整，視窗較矮時可捲動。面板仍可拖曳，並依序包含鍵盤快捷鍵、釘選置頂、設定、重新整理、最小化與關閉控制項，其中最小化與關閉兩個視窗控制項會以較寬的間距分隔。標題列的釘選按鈕、設定視窗的「視窗永遠置頂」核取方塊，以及系統匣選單的「視窗永遠置頂」核取方塊都會反映並更新同一項設定。Claude 的**目前工作階段**／**本週用量（全部）**區塊會顯示在最前面，其後才是 Codex 區塊。已購買的**點數**會顯示在 Codex 每週用量條下方，固定保留兩位小數，格式為 `點數：23.75, 自動儲值：已啟用/已停用`；未提供自動儲值狀態時會顯示為`已停用`。Claude 的每週卡片會顯示 `使用點數：6.32 / 100.00, 自動加購：已啟用/已停用`，反映其選用的按量加購額度（已花費金額對比每月上限，而非預付餘額）。每張卡片標題會顯示對應供應商自己的圖示（Claude 標誌或 OpenAI 標誌）。系統匣預設為停用：關閉面板會結束常駐程序。啟用系統匣後，關閉會隱藏面板並保留最新用量快照；隱藏期間仍會依更新間隔在背景更新，並接收 Codex 用量限制通知。按一下系統匣圖示、選擇 **顯示視窗**，或再次啟動程式時，會還原快取狀態與隱藏前的視窗位置，而不立即重新擷取。系統匣選單包含**顯示視窗**、**重新整理使用量**、**視窗永遠置頂**、**開機時自動啟動**、**設定**、**鍵盤快捷鍵**與**結束**，並以分隔線區分操作群組。選擇 **結束** 才會停止程序。系統匣提示會先顯示應用程式名稱，接著每個用量視窗各佔一行，格式為 `[Claude] 目前: 剩餘 d% (於 ... 重置)`、`[Claude] 每週: 剩餘 d% (於 ... 重置)`、`[Codex] 每週: 剩餘 d% (於 ... 重置)`，最後是使用所選最後更新日期時間格式的 `最後更新於 HH:mm`。
+
+拖曳用量卡片底部的小把手可調整該卡片高度，系統會自動儲存；把手取得焦點後也可使用向上／向下鍵。在**設定 → 外觀**中拖曳**面板字體大小**（80–150%）可預覽文字，再按**應用**或**確定**儲存。右下角的視窗縮放標記只會在游標移上時顯示。
 
 程式會從本機 `codex app-server` 程序讀取 `account/rateLimits/read`。此 API 可能演進，因此未來的 Codex release 可能需要相容性更新。Claude 用量仰賴 Anthropic 未公開文件記載的端點（參見[啟用 Claude 用量（選用）](#啟用-claude-用量選用)），該端點可能在未通知的情況下變更。
 

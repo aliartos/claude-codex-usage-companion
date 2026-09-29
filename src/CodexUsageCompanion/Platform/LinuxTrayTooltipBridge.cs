@@ -54,6 +54,13 @@ public sealed class LinuxTrayTooltipBridge
                 return false;
             }
 
+            // Replacing the D-Bus handler before Avalonia exports it makes its
+            // own export fail and leaves the icon unregistered with the watcher.
+            if (GetFieldValue(implementation, "_itemExported") is not true)
+            {
+                return false;
+            }
+
             var connection = GetFieldValue(implementation, "_connection") as DBusConnection;
             var originalHandler =
                 GetFieldValue(implementation, "_statusNotifierItemDbusObj")
