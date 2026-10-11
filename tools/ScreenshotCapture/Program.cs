@@ -5,6 +5,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using CodexUsageCompanion.Configuration;
 using CodexUsageCompanion.Localization;
 using CodexUsageCompanion.Lifecycle;
@@ -62,4 +63,32 @@ foreach (var (language, filename) in new[]
     frame.Save(output, PngBitmapEncoderOptions.Default);
     Console.WriteLine($"Captured {filename} ({frame.PixelSize})");
     window.Close();
+
+    var text = UiText.For(language);
+    var settings = new SettingsWindow(new CompanionSettings { Theme = UiThemeOptions.Dark }, text);
+    settings.Show();
+    Capture(settings, filename.Replace("overlay-", "settings-"));
+    var resetButton = settings.GetVisualDescendants().OfType<Button>()
+        .Single(button => Equals(button.Content, text.ResetDefaultsAction));
+    resetButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+    Dispatcher.UIThread.RunJobs();
+    var confirmation = settings.OwnedWindows.Single();
+    Capture(confirmation, filename.Replace("overlay-", "reset-confirmation-"));
+    confirmation.Close(false);
+    settings.Close();
+}
+
+void Capture(Window target, string filename)
+{
+    // Modal controls may need another layout pass after the window opens.
+    for (var pass = 0; pass < 3; pass++)
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+    }
+    using var frame = target.CaptureRenderedFrame()
+        ?? throw new InvalidOperationException("Screenshot rendering failed.");
+    using var output = File.Create(Path.Combine(args[0], filename));
+    frame.Save(output, PngBitmapEncoderOptions.Default);
+    Console.WriteLine($"Captured {filename} ({frame.PixelSize})");
 }

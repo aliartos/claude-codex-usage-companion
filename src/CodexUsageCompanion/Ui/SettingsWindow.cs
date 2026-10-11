@@ -645,8 +645,21 @@ public sealed class SettingsWindow : Window
                 ShowInTaskbar = false,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner
             };
-            var yes = new Button { Content = _text.YesAction, MinWidth = 88 };
-            var no = new Button { Content = _text.NoAction, MinWidth = 88, IsDefault = true };
+            var yes = new Button
+            {
+                Content = _text.YesAction,
+                MinWidth = 88,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            var no = new Button
+            {
+                Content = _text.NoAction,
+                MinWidth = 88,
+                IsDefault = true,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
             yes.Click += (_, _) => dialog.Close(true);
             no.Click += (_, _) => dialog.Close(false);
             var actions = new StackPanel

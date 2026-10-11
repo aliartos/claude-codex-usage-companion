@@ -47,6 +47,8 @@ The overlay images use sample usage data. Settings sections can be expanded by c
 
 ### Reset confirmation
 
+The **Yes/No** labels are centered horizontally and vertically within their buttons. Regenerate the overlay, settings, and confirmation images with `bash scripts/capture-screenshots.sh` (.NET 10 SDK required).
+
 | English (`en-US`) | Traditional Chinese (`zh-tw`) | Simplified Chinese (`zh-cn`) |
 | --- | --- | --- |
 | ![English reset confirmation](assets/screenshots/reset-confirmation-en.png) | ![Traditional Chinese reset confirmation](assets/screenshots/reset-confirmation-zh-tw.png) | ![Simplified Chinese reset confirmation](assets/screenshots/reset-confirmation-zh-cn.png) |

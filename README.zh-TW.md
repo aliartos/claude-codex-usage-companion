@@ -47,6 +47,8 @@ Claude Codex Usage Companion 是一套在 Linux 上執行的本機開源 Claude 
 
 ### 還原確認
 
+**是／否**按鈕文字在按鈕內水平與垂直置中。執行 `bash scripts/capture-screenshots.sh` 可重新產生面板、設定與確認視窗截圖（需要 .NET 10 SDK）。
+
 | 英文（`en-US`） | 繁體中文（`zh-tw`） | 簡體中文（`zh-cn`） |
 | --- | --- | --- |
 | ![英文還原確認](assets/screenshots/reset-confirmation-en.png) | ![繁體中文還原確認](assets/screenshots/reset-confirmation-zh-tw.png) | ![簡體中文還原確認](assets/screenshots/reset-confirmation-zh-cn.png) |
