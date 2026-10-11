@@ -67,6 +67,8 @@ public sealed class App : Application
             _window.SettingsRequested += async (_, _) => await ShowSettingsAsync();
             _window.ShortcutsRequested += (_, _) => ShowShortcuts();
             _window.AlwaysOnTopRequested += HandleAlwaysOnTopRequested;
+            _window.CardHeightChanged += HandleCardHeightChanged;
+            _window.CustomPositionChanged += HandleCustomPositionChanged;
             _window.Closing += async (_, eventArgs) =>
             {
                 if (_shutdownRequested)
@@ -83,7 +85,7 @@ public sealed class App : Application
                 eventArgs.Cancel = true;
                 if (_settings.EnableSystemTray)
                 {
-                    _window.Hide();
+                    _window.HideToTray();
                     return;
                 }
 
@@ -461,6 +463,16 @@ public sealed class App : Application
 
     private void ApplySettings(CompanionSettings settings)
     {
+        if (WindowPosition.Normalize(settings.Position) == WindowPosition.Custom &&
+            (settings.CustomPositionX is null || settings.CustomPositionY is null))
+        {
+            settings = settings with
+            {
+                CustomPositionX = _window!.Position.X,
+                CustomPositionY = _window.Position.Y
+            };
+        }
+
         var normalized = CompanionSettingsStore.Save(settings);
         SetAutostart(normalized.StartOnBoot);
         _settings = normalized;
@@ -472,6 +484,27 @@ public sealed class App : Application
         _runtime?.UpdateProviders(_settings);
         _runtime?.UpdateRefreshInterval(_settings.RefreshIntervalSeconds);
         UpdateTrayIcon();
+    }
+
+    private void HandleCustomPositionChanged(PixelPoint position)
+    {
+        try
+        {
+            _settings = CompanionSettingsStore.Save(_settings with
+            {
+                Position = WindowPosition.Custom,
+                CustomPositionX = position.X,
+                CustomPositionY = position.Y
+            });
+        }
+        catch (Exception exception) when (
+            exception is IOException or
+            UnauthorizedAccessException or
+            ArgumentException)
+        {
+            CompanionLog.Shared.Write("window-position", exception);
+            _window?.SetStatus(null, $"Unable to save window position: {exception.Message}");
+        }
     }
 
     private void HandleAlwaysOnTopRequested(bool enabled)
@@ -499,6 +532,32 @@ public sealed class App : Application
             _window.SetStatus(
                 null,
                 $"Unable to save always-on-top setting: {exception.Message}");
+        }
+    }
+
+    private void HandleCardHeightChanged(UsageCardKind kind, double height)
+    {
+        if (_window is null)
+        {
+            return;
+        }
+
+        var updated = kind switch
+        {
+            UsageCardKind.ClaudeSession => _settings with { ClaudeSessionCardHeight = height },
+            UsageCardKind.ClaudeWeekly => _settings with { ClaudeWeeklyCardHeight = height },
+            UsageCardKind.CodexFiveHour => _settings with { CodexFiveHourCardHeight = height },
+            _ => _settings with { CodexWeeklyCardHeight = height }
+        };
+        try
+        {
+            _settings = CompanionSettingsStore.Save(updated);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            CompanionLog.Shared.Write("card-height", exception);
+            _window.SetStatus(null, $"Unable to save card height: {exception.Message}");
         }
     }
 

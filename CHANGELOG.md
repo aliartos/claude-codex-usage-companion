@@ -4,11 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [0.1.3] - 2026-10-12
 
 ### Added
+
+- Window movement and resizing on Wayland desktops, per-card vertical resizing, and a font-size slider with preview.
+- A `custom` window position that saves coordinates after dragging the app window and restores them at launch.
 
 - Custom panel background colors with optional alpha transparency, live preview, validation, and a theme-color fallback.
 - Configurable horizontal spacing between the 5h/Weekly labels and percentages (default 16 pixels), and between percentages and reset times (default 8 pixels).
@@ -16,6 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Skip Avalonia XAML compilation for the C#-only UI, avoiding an intermittent build-time DLL lock.
+- Restore reliable tray registration by waiting until Avalonia exports the StatusNotifierItem before installing the tooltip bridge.
+- Apply the selected window position at startup and on settings changes through XWayland when available; use the primary monitor bounds for correct placement on mixed-size displays.
+- Restore the last on-screen position after hiding the window to the tray.
+- Restrict replacement Claude credentials files to owner access during token refresh.
 - Panel positioning now follows its configured screen anchor after provider visibility and content-size changes, including delayed native resize events.
 - Disabled providers stop polling and their pending results no longer display stale errors. Re-enabling a provider resumes refreshing without restarting the app.
 - Provider errors are tracked independently: a successful Codex refresh no longer clears an active Claude error. Hiding Claude bars preserves its errors; disabling Claude usage clears them.
@@ -24,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Updated Avalonia dependencies to 12.1.3 and synchronized application, plugin, widget, and release artifact versions.
 - Redesigned the overlay with QuotaGem-inspired provider headings and compact rounded progress bars containing the usage label, remaining percentage, reset icon, and local reset time.
 - Aligned percentage and reset/status columns across providers. The panel fits its content and selected spacing; weekly credit details are available in tooltips.
 - Updated dark and light colors and simplified the toolbar styling.

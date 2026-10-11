@@ -11,6 +11,7 @@ public static class WindowPosition
     public const string LeftBottom = "left-bottom";
     public const string MiddleBottom = "middle-bottom";
     public const string RightBottom = "right-bottom";
+    public const string Custom = "custom";
 
     public static IReadOnlyList<string> Values { get; } = Array.AsReadOnly(
     [
@@ -22,7 +23,8 @@ public static class WindowPosition
         RightCenter,
         LeftBottom,
         MiddleBottom,
-        RightBottom
+        RightBottom,
+        Custom
     ]);
 
     public static string Normalize(string? value)
@@ -38,6 +40,7 @@ public static class WindowPosition
             LeftBottom or "bottom-left" => LeftBottom,
             MiddleBottom => MiddleBottom,
             RightBottom or "bottom-right" => RightBottom,
+            Custom => Custom,
             _ => RightBottom
         };
     }

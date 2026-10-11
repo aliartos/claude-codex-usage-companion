@@ -87,6 +87,27 @@ public sealed class ClaudeCredentialsWriterTests
         }
     }
 
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    public void WriteDoesNotReplaceMalformedCredentials(string content)
+    {
+        var path = WriteTempFile(content);
+        try
+        {
+            Assert.Throws<ClaudeCredentialsFormatException>(() =>
+                ClaudeCredentialsWriter.Write(
+                    path,
+                    new ClaudeRefreshedTokens("new", "new-refresh", 1234, null, null)));
+            Assert.Equal(content, File.ReadAllText(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteTempFile(string content)
     {
         var directory = Path.Combine(Path.GetTempPath(), $"claude-writer-{Guid.NewGuid():N}");

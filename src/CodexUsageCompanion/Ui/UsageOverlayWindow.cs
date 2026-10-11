@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Automation;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -44,6 +45,17 @@ public sealed class UsageOverlayWindow : Window
     private Button _refreshButton = null!;
     private Button _closeButton = null!;
     private string _position;
+    private PixelPoint? _customPosition;
+    private PixelPoint? _manualDragOrigin;
+    private PixelPoint? _pendingCustomPosition;
+    private readonly DispatcherTimer _customPositionSaveTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(400)
+    };
+    private readonly DispatcherTimer _manualDragResetTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(1)
+    };
     private readonly int _margin;
     private bool _trayEnabled;
     private bool _showTaskbarIcon;
@@ -53,12 +65,18 @@ public sealed class UsageOverlayWindow : Window
     private bool _showCodexWeekly;
     private bool _codexEnabled;
     private bool _claudeEnabled;
+    private double _fontScale;
+    private double _claudeSessionCardHeight;
+    private double _claudeWeeklyCardHeight;
+    private double _codexFiveHourCardHeight;
+    private double _codexWeeklyCardHeight;
     private RateLimitState? _lastCodexState;
     private RateLimitState? _lastClaudeState;
     private readonly UsageStatusState _usageStatus = new();
     private string _backgroundColor = string.Empty;
     private int _percentageTimeSpacing = OverlayAppearanceOptions.DefaultSpacing;
     private int _labelPercentageSpacing = OverlayAppearanceOptions.DefaultLabelPercentageSpacing;
+    private PixelPoint? _positionBeforeTrayHide;
     private OverlayThemePalette _palette = OverlayThemePalette.Dark;
 
     public UsageOverlayWindow(CompanionSettings? settings = null, UiText? text = null)
@@ -69,6 +87,13 @@ public sealed class UsageOverlayWindow : Window
         _percentageTimeSpacing = OverlayAppearanceOptions.NormalizeSpacing(settings.PercentageTimeSpacing);
         _labelPercentageSpacing = OverlayAppearanceOptions.NormalizeLabelPercentageSpacing(settings.LabelPercentageSpacing);
         _position = WindowPosition.Normalize(settings.Position);
+        _customPosition = GetCustomPosition(settings);
+        _customPositionSaveTimer.Tick += (_, _) => FlushCustomPosition();
+        _manualDragResetTimer.Tick += (_, _) =>
+        {
+            _manualDragResetTimer.Stop();
+            _manualDragOrigin = null;
+        };
         _margin = settings.Margin;
         _trayEnabled = settings.EnableSystemTray;
         _showTaskbarIcon = settings.ShowTaskbarIcon;
@@ -79,15 +104,19 @@ public sealed class UsageOverlayWindow : Window
         _codexEnabled = settings.EnableCodexUsage;
         _claudeEnabled = settings.EnableClaudeUsage;
         _usageStatus.ApplyProviders(settings);
+        _fontScale = OverlayLayoutOptions.NormalizeFontScale(settings.FontScale);
+        _claudeSessionCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeSessionCardHeight, weekly: false);
+        _claudeWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeWeeklyCardHeight, weekly: true);
+        _codexFiveHourCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexFiveHourCardHeight, weekly: false);
+        _codexWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexWeeklyCardHeight, weekly: true);
 
         Title = "Claude Codex Usage Companion";
         Width = 430;
         Height = ComputeHeight();
-        MinWidth = Width;
-        MaxWidth = Width;
-        MinHeight = Height;
-        MaxHeight = Height;
-        CanResize = false;
+        MinWidth = 280;
+        MinHeight = 120;
+        CanResize = true;
+        ExtendClientAreaToDecorationsHint = true;
         WindowDecorations = Avalonia.Controls.WindowDecorations.None;
         ShowInTaskbar = _showTaskbarIcon;
         Topmost = settings.AlwaysOnTop;
@@ -111,10 +140,10 @@ public sealed class UsageOverlayWindow : Window
         };
         var stack = new StackPanel { Spacing = CardSpacing };
         var header = CreateHeader();
-        _codexFiveHourCard = CreateCard(_text.ProgressFiveHourLabel, showDetails: false);
-        _codexWeeklyCard = CreateCard(_text.ProgressWeeklyLabel, showDetails: true);
-        _claudeFiveHourCard = CreateCard(_text.ProgressFiveHourLabel, showDetails: false);
-        _claudeWeeklyCard = CreateCard(_text.ProgressWeeklyLabel, showDetails: true);
+        _codexFiveHourCard = CreateCard(UsageCardKind.CodexFiveHour, _text.ProgressFiveHourLabel, showDetails: false);
+        _codexWeeklyCard = CreateCard(UsageCardKind.CodexWeekly, _text.ProgressWeeklyLabel, showDetails: true);
+        _claudeFiveHourCard = CreateCard(UsageCardKind.ClaudeSession, _text.ProgressFiveHourLabel, showDetails: false);
+        _claudeWeeklyCard = CreateCard(UsageCardKind.ClaudeWeekly, _text.ProgressWeeklyLabel, showDetails: true);
         _claudeGroup = CreateProviderGroup("Claude", CreateClaudeIcon, _claudeFiveHourCard, _claudeWeeklyCard);
         _codexGroup = CreateProviderGroup("Codex", CreateCodexIcon, _codexFiveHourCard, _codexWeeklyCard);
         ApplyCardVisibility();
@@ -126,19 +155,56 @@ public sealed class UsageOverlayWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis
         };
 
-        stack.Children.Add(header);
         stack.Children.Add(_claudeGroup);
         stack.Children.Add(_codexGroup);
         stack.Children.Add(_status);
-        _root.Child = stack;
+        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
+        var scroll = new ScrollViewer
+        {
+            Content = stack,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        Grid.SetRow(scroll, 1);
+        layout.Children.Add(header);
+        layout.Children.Add(scroll);
+        var resizeGrip = new Border
+        {
+            Width = 24,
+            Height = 24,
+            Background = Brushes.Transparent,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, -9, -9),
+            Child = new TextBlock
+            {
+                Text = "◢",
+                FontSize = 13,
+                Foreground = Brush("#8E938E"),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Bottom
+            }
+        };
+        resizeGrip.Child!.Opacity = 0;
+        resizeGrip.PointerEntered += (_, _) => resizeGrip.Child!.Opacity = 0.8;
+        resizeGrip.PointerExited += (_, _) => resizeGrip.Child!.Opacity = 0;
+        resizeGrip.PointerPressed += HandleResizeGripPointerPressed;
+        Grid.SetRow(resizeGrip, 1);
+        layout.Children.Add(resizeGrip);
+        _root.Child = layout;
         Content = _root;
+        ApplyFontScale();
+        ApplyCardHeights();
         ApplyComputedHeight();
         ActualThemeVariantChanged += (_, _) => ApplyThemePalette();
         SizeChanged += HandleWindowSizeChanged;
+        PositionChanged += HandlePositionChanged;
+        Closed += (_, _) => { FlushCustomPosition(); _manualDragResetTimer.Stop(); };
 
         Opened += (_, _) =>
         {
-            PositionOnPrimaryScreen();
+            if (GetTrayRestorePosition() is { } savedPosition) Position = savedPosition;
+            else PositionOnPrimaryScreen();
             ApplyThemePalette();
         };
         AddHandler(KeyDownEvent, HandleKeyDown, RoutingStrategies.Tunnel);
@@ -147,6 +213,8 @@ public sealed class UsageOverlayWindow : Window
     public event EventHandler? RefreshRequested;
     public event EventHandler? SettingsRequested;
     public event EventHandler? ShortcutsRequested;
+    public event Action<UsageCardKind, double>? CardHeightChanged;
+    public event Action<PixelPoint>? CustomPositionChanged;
     public event Action<bool>? AlwaysOnTopRequested;
 
     private void HandleKeyDown(object? sender, KeyEventArgs eventArgs)
@@ -194,7 +262,6 @@ public sealed class UsageOverlayWindow : Window
                 state?.AutomaticReloadEnabled == true);
             ToolTip.SetTip(_codexWeeklyCard.Container, _codexWeeklyCard.Details.Text);
             FitResetColumns();
-            ApplyComputedHeight();
             return;
         }
 
@@ -204,7 +271,6 @@ public sealed class UsageOverlayWindow : Window
         _claudeWeeklyCard.Details.Text = _text.FormatClaudeCreditsDetails(state?.ExtraUsage);
         ToolTip.SetTip(_claudeWeeklyCard.Container, _claudeWeeklyCard.Details.Text);
         FitResetColumns();
-        ApplyComputedHeight();
     }
 
     public void SetLoading(bool loading)
@@ -236,6 +302,7 @@ public sealed class UsageOverlayWindow : Window
 
     public void ApplySettings(CompanionSettings settings, UiText text)
     {
+        _customPosition = GetCustomPosition(settings);
         _text = text;
         _trayEnabled = settings.EnableSystemTray;
         _showTaskbarIcon = settings.ShowTaskbarIcon;
@@ -248,11 +315,19 @@ public sealed class UsageOverlayWindow : Window
         _codexEnabled = settings.EnableCodexUsage;
         _claudeEnabled = settings.EnableClaudeUsage;
         _usageStatus.ApplyProviders(settings);
+        _fontScale = OverlayLayoutOptions.NormalizeFontScale(settings.FontScale);
+        _claudeSessionCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeSessionCardHeight, weekly: false);
+        _claudeWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeWeeklyCardHeight, weekly: true);
+        _codexFiveHourCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexFiveHourCardHeight, weekly: false);
+        _codexWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexWeeklyCardHeight, weekly: true);
         _codexFiveHourCard.Title.Text = text.ProgressFiveHourLabel;
         _codexWeeklyCard.Title.Text = text.ProgressWeeklyLabel;
         _claudeFiveHourCard.Title.Text = text.ProgressFiveHourLabel;
         _claudeWeeklyCard.Title.Text = text.ProgressWeeklyLabel;
         _headerTitle.Text = text.CombinedUsageHeaderTitle;
+        ApplyFontScale();
+        ApplyCardHeights();
+        foreach (var kind in Enum.GetValues<UsageCardKind>()) UpdateCardResizeHint(GetCard(kind));
         ApplyCardVisibility();
         ApplySizeAndPosition(settings.Position);
         ToolTip.SetTip(_minimizeButton, text.MinimizeAction);
@@ -288,6 +363,7 @@ public sealed class UsageOverlayWindow : Window
     public void RestoreAndActivate()
     {
         var wasHidden = !IsVisible;
+        var restorePosition = wasHidden ? GetTrayRestorePosition() : null;
         var restoreTopmost = wasHidden && Topmost;
         // Some X11 window managers discard _NET_WM_STATE_ABOVE and
         // _NET_WM_STATE_SKIP_TASKBAR when a window is unmapped. Change the
@@ -311,13 +387,167 @@ public sealed class UsageOverlayWindow : Window
         }
 
         WindowState = WindowState.Normal;
+        if (restorePosition is { } savedPosition)
+        {
+            Position = savedPosition;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (IsVisible)
+                {
+                    Position = savedPosition;
+                }
+            }, DispatcherPriority.Background);
+        }
         Activate();
     }
 
     public void ApplyPosition(string position)
     {
+        _manualDragOrigin = null;
+        _manualDragResetTimer.Stop();
+        _customPositionSaveTimer.Stop();
+        _pendingCustomPosition = null;
         _position = WindowPosition.Normalize(position);
+        if (_position == WindowPosition.Custom && _customPosition is null && IsVisible)
+        {
+            _customPosition = Position;
+        }
         PositionOnPrimaryScreen();
+    }
+
+    public void HideToTray()
+    {
+        FlushCustomPosition();
+        if (IsVisible)
+        {
+            _positionBeforeTrayHide = Position;
+        }
+
+        Hide();
+    }
+
+    private PixelPoint? GetTrayRestorePosition() =>
+        _positionBeforeTrayHide is { } savedPosition &&
+        Screens.All.Any(screen => screen.Bounds.Contains(savedPosition))
+            ? savedPosition
+            : null;
+
+    private static PixelPoint? GetCustomPosition(CompanionSettings settings) =>
+        settings.CustomPositionX is { } x && settings.CustomPositionY is { } y
+            ? new PixelPoint(x, y)
+            : null;
+
+    private void HandlePositionChanged(object? sender, PixelPointEventArgs eventArgs)
+    {
+        if (_manualDragOrigin is { } origin && Position != origin)
+        {
+            _position = WindowPosition.Custom;
+            _manualDragOrigin = null;
+            _manualDragResetTimer.Stop();
+        }
+
+        if (_position != WindowPosition.Custom || !IsVisible)
+        {
+            return;
+        }
+
+        _customPosition = Position;
+        _pendingCustomPosition = Position;
+        _customPositionSaveTimer.Stop();
+        _customPositionSaveTimer.Start();
+    }
+
+    private void FlushCustomPosition()
+    {
+        _customPositionSaveTimer.Stop();
+        if (_pendingCustomPosition is not { } position)
+        {
+            return;
+        }
+
+        _pendingCustomPosition = null;
+        CustomPositionChanged?.Invoke(position);
+    }
+
+    private double EffectiveCardHeight(double configuredHeight, bool weekly) =>
+        Math.Max(configuredHeight, OverlayLayoutOptions.MinimumCardHeight(weekly, _fontScale));
+
+    private double GetConfiguredCardHeight(UsageCardKind kind) => kind switch
+    {
+        UsageCardKind.ClaudeSession => _claudeSessionCardHeight,
+        UsageCardKind.ClaudeWeekly => _claudeWeeklyCardHeight,
+        UsageCardKind.CodexFiveHour => _codexFiveHourCardHeight,
+        _ => _codexWeeklyCardHeight
+    };
+
+    private void SetCardHeight(UsageCardKind kind, double height)
+    {
+        var weekly = kind is UsageCardKind.ClaudeWeekly or UsageCardKind.CodexWeekly;
+        var normalized = OverlayLayoutOptions.NormalizeCardHeight(height, weekly);
+        switch (kind)
+        {
+            case UsageCardKind.ClaudeSession:
+                _claudeSessionCardHeight = normalized;
+                break;
+            case UsageCardKind.ClaudeWeekly:
+                _claudeWeeklyCardHeight = normalized;
+                break;
+            case UsageCardKind.CodexFiveHour:
+                _codexFiveHourCardHeight = normalized;
+                break;
+            case UsageCardKind.CodexWeekly:
+                _codexWeeklyCardHeight = normalized;
+                break;
+        }
+
+        GetCard(kind).Container.Height = EffectiveCardHeight(normalized, weekly);
+    }
+
+    private UsageCardControls GetCard(UsageCardKind kind) => kind switch
+    {
+        UsageCardKind.ClaudeSession => _claudeFiveHourCard,
+        UsageCardKind.ClaudeWeekly => _claudeWeeklyCard,
+        UsageCardKind.CodexFiveHour => _codexFiveHourCard,
+        _ => _codexWeeklyCard
+    };
+
+    private void ApplyCardHeights()
+    {
+        foreach (var kind in Enum.GetValues<UsageCardKind>())
+        {
+            var weekly = kind is UsageCardKind.ClaudeWeekly or UsageCardKind.CodexWeekly;
+            GetCard(kind).Container.Height = EffectiveCardHeight(GetConfiguredCardHeight(kind), weekly);
+        }
+    }
+
+    private void ApplyFontScale()
+    {
+        foreach (var title in _providerTitles) title.FontSize = 21 * _fontScale;
+        _headerTitle.FontSize = 11 * _fontScale;
+        _status.FontSize = 11 * _fontScale;
+        foreach (var card in new[]
+                 { _claudeFiveHourCard, _claudeWeeklyCard, _codexFiveHourCard, _codexWeeklyCard })
+        {
+            card.Title.FontSize = 14 * _fontScale;
+            card.Remaining.FontSize = 13 * _fontScale;
+            card.Reset.FontSize = 11.5 * _fontScale;
+            card.Details.FontSize = 11 * _fontScale;
+        }
+    }
+
+    private void UpdateCardResizeHint(UsageCardControls card)
+    {
+        var hint = _text.FormatResizeCardHint(card.Title.Text ?? string.Empty);
+        ToolTip.SetTip(card.ResizeStrip, hint);
+        AutomationProperties.SetName(card.ResizeStrip, hint);
+    }
+
+    private void HandleResizeGripPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            BeginResizeDrag(WindowEdge.SouthEast, eventArgs);
+        }
     }
 
     private void ApplyCardVisibility()
@@ -336,8 +566,14 @@ public sealed class UsageOverlayWindow : Window
         if (_root is null)
             return 70;
 
-        _root.Measure(new Size(Width, double.PositiveInfinity));
-        return Math.Ceiling(_root.DesiredSize.Height);
+        var groups = new[] { _claudeGroup, _codexGroup };
+        var height = 70 + 12 * (_fontScale - 1);
+        foreach (var group in groups.Where(group => group.IsVisible))
+        {
+            group.Measure(new Size(Width - 26, double.PositiveInfinity));
+            height += group.DesiredSize.Height + CardSpacing;
+        }
+        return Math.Max(MinHeight, Math.Ceiling(height));
     }
 
     private void ApplyComputedHeight()
@@ -346,18 +582,14 @@ public sealed class UsageOverlayWindow : Window
         if (Math.Abs(Height - targetHeight) < 0.5)
             return;
 
-        MinHeight = Math.Min(MinHeight, targetHeight);
-        MaxHeight = Math.Max(MaxHeight, targetHeight);
         Height = targetHeight;
-        MinHeight = targetHeight;
-        MaxHeight = targetHeight;
         PositionOnPrimaryScreen();
         Dispatcher.UIThread.Post(CompletePendingReposition, DispatcherPriority.Loaded);
     }
 
     private void ApplySizeAndPosition(string position)
     {
-        _position = WindowPosition.Normalize(position);
+        ApplyPosition(position);
         ApplyComputedHeight();
         PositionOnPrimaryScreen();
         Dispatcher.UIThread.Post(
@@ -374,9 +606,7 @@ public sealed class UsageOverlayWindow : Window
 
     private void CompletePendingReposition()
     {
-        // Provider visibility may invalidate layout asynchronously. Measure again
-        // after layout so positioning uses the final content height.
-        ApplyComputedHeight();
+        // Native layout may complete after a requested content resize.
         PositionOnPrimaryScreen();
     }
 
@@ -537,10 +767,11 @@ public sealed class UsageOverlayWindow : Window
         };
     }
 
-    private static UsageCardControls CreateCard(string title, bool showDetails)
+    private UsageCardControls CreateCard(UsageCardKind kind, string title, bool showDetails)
     {
         var container = new Border
         {
+            Height = EffectiveCardHeight(GetConfiguredCardHeight(kind), showDetails),
             Background = Brush("#FF353835"),
             BorderBrush = Brush("#FF4A4E4A"),
             BorderThickness = new Thickness(0),
@@ -593,10 +824,9 @@ public sealed class UsageOverlayWindow : Window
         Grid.SetRow(details, 2);
         Grid.SetColumnSpan(details, 2);
 
-        var bar = new StackPanel
+        var bar = new Grid
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 0,
+            ColumnDefinitions = new ColumnDefinitions("*,*,*,*,*"),
             VerticalAlignment = VerticalAlignment.Bottom
         };
         var fills = new Border[5];
@@ -613,7 +843,6 @@ public sealed class UsageOverlayWindow : Window
             };
             var cell = new Border
             {
-                Width = (430 - 26) / 5d,
                 Height = 36,
                 Background = Brush("#FF4A4D49"),
                 CornerRadius = new CornerRadius(0),
@@ -622,6 +851,7 @@ public sealed class UsageOverlayWindow : Window
             };
             cells[index] = cell;
             fills[index] = fill;
+            Grid.SetColumn(cell, index);
             bar.Children.Add(cell);
         }
 
@@ -653,17 +883,90 @@ public sealed class UsageOverlayWindow : Window
         Grid.SetRow(progress, 0);
         Grid.SetColumnSpan(progress, 2);
         grid.Children.Add(progress);
-        container.Child = grid;
-        return new UsageCardControls(
-            container,
-            titleText,
-            remaining,
-            reset,
-            resetIcon,
-            details,
-            labels,
-            cells,
-            fills);
+        var resizeMark = new Border
+        {
+            Width = 28,
+            Height = 2,
+            Background = Brush("#8E938E"),
+            CornerRadius = new CornerRadius(1),
+            Opacity = 0.45,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var resizeStrip = new Border
+        {
+            Height = 12,
+            Background = Brushes.Transparent,
+            Child = resizeMark,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            RenderTransform = new TranslateTransform(0, 8),
+            Focusable = true
+        };
+        var cardLayout = new Grid();
+        cardLayout.Children.Add(grid);
+        cardLayout.Children.Add(resizeStrip);
+        container.Child = cardLayout;
+        resizeStrip.PointerEntered += (_, _) => resizeMark.Opacity = 0.9;
+        resizeStrip.PointerExited += (_, _) => resizeMark.Opacity = 0.45;
+        resizeStrip.GotFocus += (_, _) => resizeMark.Opacity = 0.9;
+        resizeStrip.LostFocus += (_, _) => resizeMark.Opacity = 0.45;
+        resizeStrip.KeyDown += (_, eventArgs) =>
+        {
+            if (eventArgs.Key is not (Key.Up or Key.Down))
+            {
+                return;
+            }
+
+            SetCardHeight(kind, GetConfiguredCardHeight(kind) + (eventArgs.Key == Key.Up ? -10 : 10));
+            CardHeightChanged?.Invoke(kind, GetConfiguredCardHeight(kind));
+            eventArgs.Handled = true;
+        };
+        var dragging = false;
+        var startY = 0d;
+        var startHeight = 0d;
+        resizeStrip.PointerPressed += (_, eventArgs) =>
+        {
+            if (!eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            dragging = true;
+            startY = eventArgs.GetPosition(this).Y;
+            startHeight = container.Height;
+            eventArgs.Pointer.Capture(resizeStrip);
+            eventArgs.Handled = true;
+        };
+        resizeStrip.PointerMoved += (_, eventArgs) =>
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            var target = startHeight + eventArgs.GetPosition(this).Y - startY;
+            var minimum = OverlayLayoutOptions.MinimumCardHeight(showDetails, _fontScale);
+            SetCardHeight(kind, Math.Clamp(target, minimum, OverlayLayoutOptions.MaximumCardHeight));
+            eventArgs.Handled = true;
+        };
+        resizeStrip.PointerReleased += (_, eventArgs) =>
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            dragging = false;
+            eventArgs.Pointer.Capture(null);
+            CardHeightChanged?.Invoke(kind, GetConfiguredCardHeight(kind));
+            eventArgs.Handled = true;
+        };
+        resizeStrip.PointerCaptureLost += (_, _) => dragging = false;
+        var card = new UsageCardControls(container, titleText, remaining, reset,
+            resetIcon, details, labels, cells, fills, resizeStrip);
+        UpdateCardResizeHint(card);
+        foreach (var cell in cells) cell.SizeChanged += (_, _) => UpdateBarFillWidths(card);
+        return card;
     }
 
     private void FitResetColumns()
@@ -688,26 +991,16 @@ public sealed class UsageOverlayWindow : Window
         var labelColumnWidth = Math.Ceiling(labelWidth) + _labelPercentageSpacing;
         var resetColumnWidth = Math.Min(Math.Ceiling(resetWidth), 228);
         var targetWidth = Math.Max(280, 26 + labelColumnWidth + 92 + _percentageTimeSpacing + 16 + resetColumnWidth);
-        if (Math.Abs(Width - targetWidth) >= 0.5)
+        if (Width < targetWidth)
         {
-            MinWidth = Math.Min(MinWidth, targetWidth);
-            MaxWidth = Math.Max(MaxWidth, targetWidth);
             Width = targetWidth;
-            MinWidth = MaxWidth = targetWidth;
             PositionOnPrimaryScreen();
-            Dispatcher.UIThread.Post(CompletePendingReposition, DispatcherPriority.Loaded);
         }
         foreach (var card in cards)
         {
             card.Labels.ColumnDefinitions[0].Width = new GridLength(labelColumnWidth);
             card.Labels.ColumnDefinitions[3].Width = new GridLength(resetColumnWidth);
-            for (var index = 0; index < card.Cells.Length; index++)
-            {
-                var ratio = card.Cells[index].Width > 0
-                    ? card.Fills[index].Width / card.Cells[index].Width : 0;
-                card.Cells[index].Width = (targetWidth - 26) / 5;
-                card.Fills[index].Width = card.Cells[index].Width * ratio;
-            }
+
         }
     }
 
@@ -738,30 +1031,56 @@ public sealed class UsageOverlayWindow : Window
         var color = SignalBrush(signal);
         var ratios = UsagePresentation.GetCellFillRatios(remainingPercent);
         card.Remaining.Foreground = Brush(_palette.CardTitle);
+        card.FillRatios = ratios;
         for (var index = 0; index < card.Fills.Length; index++)
         {
             card.Fills[index].Background = color;
-            card.Fills[index].Width = card.Cells[index].Width * ratios[index];
+        }
+        UpdateBarFillWidths(card);
+    }
+
+    private static void UpdateBarFillWidths(UsageCardControls card)
+    {
+        for (var index = 0; index < card.Fills.Length; index++)
+        {
+            card.Fills[index].Width = card.Cells[index].Bounds.Width * card.FillRatios[index];
         }
     }
 
     private void HandleHeaderPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
-        if (eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        if (!eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            BeginMoveDrag(eventArgs);
+            return;
         }
+
+        _manualDragOrigin = Position;
+        _manualDragResetTimer.Stop();
+        _manualDragResetTimer.Interval = TimeSpan.FromSeconds(10);
+        _manualDragResetTimer.Start();
+        BeginMoveDrag(eventArgs);
     }
 
     private void PositionOnPrimaryScreen()
     {
+        if (_position == WindowPosition.Custom && _customPosition is { } customPosition)
+        {
+            if (Screens.All.Any(screen => screen.Bounds.Contains(customPosition)))
+            {
+                Position = customPosition;
+                return;
+            }
+        }
+
         var screen = Screens.Primary;
         if (screen is null)
         {
             return;
         }
 
-        var area = screen.WorkingArea;
+        // XWayland can report one global work area clipped to the shortest
+        // monitor. Use the selected monitor's bounds for all nine positions.
+        var area = screen.Bounds;
         var width = (int)Math.Ceiling(Width * screen.Scaling);
         var height = (int)Math.Ceiling(Height * screen.Scaling);
         var margin = (int)Math.Ceiling(_margin * screen.Scaling);
@@ -862,5 +1181,9 @@ public sealed class UsageOverlayWindow : Window
         TextBlock Details,
         Grid Labels,
         Border[] Cells,
-        Border[] Fills);
+        Border[] Fills,
+        Border ResizeStrip)
+    {
+        public double[] FillRatios { get; set; } = new double[5];
+    }
 }
