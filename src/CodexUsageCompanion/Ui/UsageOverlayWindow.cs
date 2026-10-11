@@ -1,7 +1,6 @@
 using Avalonia;
-using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Controls.Chrome;
+using Avalonia.Automation;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -19,13 +18,11 @@ namespace CodexUsageCompanion.Ui;
 
 public sealed class UsageOverlayWindow : Window
 {
-    private const double BaseHeight = 66;
-    private const double CardSpacing = 9;
-    private const double IconSize = 14;
+    private const double CardSpacing = 12;
+    private const double IconSize = 20;
     private const double HeaderGroupSpacing = 14;
-    private const string CodexAccentColor = "#10A37F";
+    private const string CodexAccentColor = "#8D9BEF";
     private const string ClaudeIconBackground = "#D77655";
-    private const string ClaudeIconForeground = "#FCF2EE";
     private const string ClaudeIconPath =
         "M142.27 316.619l73.655-41.326 1.238-3.589-1.238-1.996-3.589-.001-12.31-.759-42.084-1.138-36.498-1.516-35.361-1.896-8.897-1.895-8.34-10.995.859-5.484 7.482-5.03 10.717.935 23.683 1.617 35.537 2.452 25.782 1.517 38.193 3.968h6.064l.86-2.451-2.073-1.517-1.618-1.517-36.776-24.922-39.81-26.338-20.852-15.166-11.273-7.683-5.687-7.204-2.451-15.721 10.237-11.273 13.75.935 3.513.936 13.928 10.716 29.749 23.027 38.848 28.612 5.687 4.727 2.275-1.617.278-1.138-2.553-4.271-21.13-38.193-22.546-38.848-10.035-16.101-2.654-9.655c-.935-3.968-1.617-7.304-1.617-11.374l11.652-15.823 6.445-2.073 15.545 2.073 6.547 5.687 9.655 22.092 15.646 34.78 24.265 47.291 7.103 14.028 3.791 12.992 1.416 3.968 2.449-.001v-2.275l1.997-26.641 3.69-32.707 3.589-42.084 1.239-11.854 5.863-14.206 11.652-7.683 9.099 4.348 7.482 10.716-1.036 6.926-4.449 28.915-8.72 45.294-5.687 30.331h3.313l3.792-3.791 15.342-20.372 25.782-32.227 11.374-12.789 13.27-14.129 8.517-6.724 16.1-.001 11.854 17.617-5.307 18.199-16.581 21.029-13.75 17.819-19.716 26.54-12.309 21.231 1.138 1.694 2.932-.278 44.536-9.479 24.062-4.347 28.714-4.928 12.992 6.066 1.416 6.167-5.106 12.613-30.71 7.583-36.018 7.204-53.636 12.689-.657.48.758.935 24.164 2.275 10.337.556h25.301l47.114 3.514 12.309 8.139 7.381 9.959-1.238 7.583-18.957 9.655-25.579-6.066-59.702-14.205-20.474-5.106-2.83-.001v1.694l17.061 16.682 31.266 28.233 39.152 36.397 1.997 8.999-5.03 7.102-5.307-.758-34.401-25.883-13.27-11.651-30.053-25.302-1.996-.001v2.654l6.926 10.136 36.574 54.975 1.895 16.859-2.653 5.485-9.479 3.311-10.414-1.895-21.408-30.054-22.092-33.844-17.819-30.331-2.173 1.238-10.515 113.261-4.929 5.788-11.374 4.348-9.478-7.204-5.03-11.652 5.03-23.027 6.066-30.052 4.928-23.886 4.449-29.674 2.654-9.858-.177-.657-2.173.278-22.37 30.71-34.021 45.977-26.919 28.815-6.445 2.553-11.173-5.789 1.037-10.337 6.243-9.2 37.257-47.392 22.47-29.371 14.508-16.961-.101-2.451h-.859l-98.954 64.251-17.618 2.275-7.583-7.103.936-11.652 3.589-3.791 29.749-20.474-.101.102.024.101z";
     private const string CodexIconPath =
@@ -36,6 +33,9 @@ public sealed class UsageOverlayWindow : Window
     private readonly UsageCardControls _claudeWeeklyCard;
     private UiText _text;
     private readonly Border _root;
+    private Border _claudeGroup = null!;
+    private Border _codexGroup = null!;
+    private readonly List<TextBlock> _providerTitles = [];
     private TextBlock _headerTitle = null!;
     private readonly TextBlock _status;
     private Button _minimizeButton = null!;
@@ -72,9 +72,10 @@ public sealed class UsageOverlayWindow : Window
     private double _codexWeeklyCardHeight;
     private RateLimitState? _lastCodexState;
     private RateLimitState? _lastClaudeState;
-    private DateTimeOffset? _lastUpdatedAt;
-    private string? _lastError;
-    private bool _repositionAfterResize;
+    private readonly UsageStatusState _usageStatus = new();
+    private string _backgroundColor = string.Empty;
+    private int _percentageTimeSpacing = OverlayAppearanceOptions.DefaultSpacing;
+    private int _labelPercentageSpacing = OverlayAppearanceOptions.DefaultLabelPercentageSpacing;
     private PixelPoint? _positionBeforeTrayHide;
     private OverlayThemePalette _palette = OverlayThemePalette.Dark;
 
@@ -82,6 +83,9 @@ public sealed class UsageOverlayWindow : Window
     {
         settings ??= new CompanionSettings();
         _text = text ?? UiText.For(UiLanguage.English);
+        _backgroundColor = OverlayAppearanceOptions.NormalizeBackgroundColor(settings.BackgroundColor);
+        _percentageTimeSpacing = OverlayAppearanceOptions.NormalizeSpacing(settings.PercentageTimeSpacing);
+        _labelPercentageSpacing = OverlayAppearanceOptions.NormalizeLabelPercentageSpacing(settings.LabelPercentageSpacing);
         _position = WindowPosition.Normalize(settings.Position);
         _customPosition = GetCustomPosition(settings);
         _customPositionSaveTimer.Tick += (_, _) => FlushCustomPosition();
@@ -99,6 +103,7 @@ public sealed class UsageOverlayWindow : Window
         _showCodexWeekly = settings.ShowCodexWeekly;
         _codexEnabled = settings.EnableCodexUsage;
         _claudeEnabled = settings.EnableClaudeUsage;
+        _usageStatus.ApplyProviders(settings);
         _fontScale = OverlayLayoutOptions.NormalizeFontScale(settings.FontScale);
         _claudeSessionCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeSessionCardHeight, weekly: false);
         _claudeWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeWeeklyCardHeight, weekly: true);
@@ -106,13 +111,13 @@ public sealed class UsageOverlayWindow : Window
         _codexWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexWeeklyCardHeight, weekly: true);
 
         Title = "Claude Codex Usage Companion";
-        Width = Math.Ceiling(344 * _fontScale);
+        Width = 430;
         Height = ComputeHeight();
-        MinWidth = 344;
-        MinHeight = 180;
+        MinWidth = 280;
+        MinHeight = 120;
         CanResize = true;
-        WindowDecorations = Avalonia.Controls.WindowDecorations.None;
         ExtendClientAreaToDecorationsHint = true;
+        WindowDecorations = Avalonia.Controls.WindowDecorations.None;
         ShowInTaskbar = _showTaskbarIcon;
         Topmost = settings.AlwaysOnTop;
         Opacity = settings.Opacity;
@@ -135,10 +140,12 @@ public sealed class UsageOverlayWindow : Window
         };
         var stack = new StackPanel { Spacing = CardSpacing };
         var header = CreateHeader();
-        _codexFiveHourCard = CreateCard(UsageCardKind.CodexFiveHour, _text.FiveHourTitle, CreateCodexIcon, showDetails: false);
-        _codexWeeklyCard = CreateCard(UsageCardKind.CodexWeekly, _text.WeeklyTitle, CreateCodexIcon, showDetails: true);
-        _claudeFiveHourCard = CreateCard(UsageCardKind.ClaudeSession, _text.ClaudeFiveHourTitle, CreateClaudeIcon, showDetails: false);
-        _claudeWeeklyCard = CreateCard(UsageCardKind.ClaudeWeekly, _text.ClaudeWeeklyTitle, CreateClaudeIcon, showDetails: true);
+        _codexFiveHourCard = CreateCard(UsageCardKind.CodexFiveHour, _text.ProgressFiveHourLabel, showDetails: false);
+        _codexWeeklyCard = CreateCard(UsageCardKind.CodexWeekly, _text.ProgressWeeklyLabel, showDetails: true);
+        _claudeFiveHourCard = CreateCard(UsageCardKind.ClaudeSession, _text.ProgressFiveHourLabel, showDetails: false);
+        _claudeWeeklyCard = CreateCard(UsageCardKind.ClaudeWeekly, _text.ProgressWeeklyLabel, showDetails: true);
+        _claudeGroup = CreateProviderGroup("Claude", CreateClaudeIcon, _claudeFiveHourCard, _claudeWeeklyCard);
+        _codexGroup = CreateProviderGroup("Codex", CreateCodexIcon, _codexFiveHourCard, _codexWeeklyCard);
         ApplyCardVisibility();
         _status = new TextBlock
         {
@@ -148,10 +155,8 @@ public sealed class UsageOverlayWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis
         };
 
-        stack.Children.Add(_claudeFiveHourCard.Container);
-        stack.Children.Add(_claudeWeeklyCard.Container);
-        stack.Children.Add(_codexFiveHourCard.Container);
-        stack.Children.Add(_codexWeeklyCard.Container);
+        stack.Children.Add(_claudeGroup);
+        stack.Children.Add(_codexGroup);
         stack.Children.Add(_status);
         var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
         var scroll = new ScrollViewer
@@ -189,20 +194,17 @@ public sealed class UsageOverlayWindow : Window
         _root.Child = layout;
         Content = _root;
         ApplyFontScale();
+        ApplyCardHeights();
+        ApplyComputedHeight();
         ActualThemeVariantChanged += (_, _) => ApplyThemePalette();
         SizeChanged += HandleWindowSizeChanged;
         PositionChanged += HandlePositionChanged;
+        Closed += (_, _) => { FlushCustomPosition(); _manualDragResetTimer.Stop(); };
 
         Opened += (_, _) =>
         {
-            if (GetTrayRestorePosition() is { } savedPosition)
-            {
-                Position = savedPosition;
-            }
-            else
-            {
-                PositionOnPrimaryScreen();
-            }
+            if (GetTrayRestorePosition() is { } savedPosition) Position = savedPosition;
+            else PositionOnPrimaryScreen();
             ApplyThemePalette();
         };
         AddHandler(KeyDownEvent, HandleKeyDown, RoutingStrategies.Tunnel);
@@ -211,9 +213,9 @@ public sealed class UsageOverlayWindow : Window
     public event EventHandler? RefreshRequested;
     public event EventHandler? SettingsRequested;
     public event EventHandler? ShortcutsRequested;
-    public event Action<bool>? AlwaysOnTopRequested;
     public event Action<UsageCardKind, double>? CardHeightChanged;
     public event Action<PixelPoint>? CustomPositionChanged;
+    public event Action<bool>? AlwaysOnTopRequested;
 
     private void HandleKeyDown(object? sender, KeyEventArgs eventArgs)
     {
@@ -258,6 +260,8 @@ public sealed class UsageOverlayWindow : Window
             _codexWeeklyCard.Details.Text = _text.FormatCreditDetails(
                 state?.CreditBalance,
                 state?.AutomaticReloadEnabled == true);
+            ToolTip.SetTip(_codexWeeklyCard.Container, _codexWeeklyCard.Details.Text);
+            FitResetColumns();
             return;
         }
 
@@ -265,6 +269,8 @@ public sealed class UsageOverlayWindow : Window
         UpdateCard(_claudeFiveHourCard, state?.FiveHour, weekly: false, dataAvailable: state is not null);
         UpdateCard(_claudeWeeklyCard, state?.Weekly, weekly: true, dataAvailable: state is not null);
         _claudeWeeklyCard.Details.Text = _text.FormatClaudeCreditsDetails(state?.ExtraUsage);
+        ToolTip.SetTip(_claudeWeeklyCard.Container, _claudeWeeklyCard.Details.Text);
+        FitResetColumns();
     }
 
     public void SetLoading(bool loading)
@@ -273,20 +279,24 @@ public sealed class UsageOverlayWindow : Window
         _refreshButton.Content = loading ? "…" : "↻";
     }
 
-    public void SetStatus(DateTimeOffset? updatedAt, string? error)
+    public void SetStatus(DateTimeOffset? updatedAt, string? error, UsageProvider? provider = null)
     {
-        _lastUpdatedAt = updatedAt;
-        _lastError = error;
-        if (!string.IsNullOrWhiteSpace(error))
+        _usageStatus.Update(updatedAt, error, provider);
+        RenderStatus();
+    }
+
+    private void RenderStatus()
+    {
+        if (!string.IsNullOrWhiteSpace(_usageStatus.Error))
         {
-            _status.Text = error;
+            _status.Text = _usageStatus.Error;
             _status.Foreground = Brush(_palette.ErrorText);
             return;
         }
 
-        _status.Text = updatedAt is null
-            ? _text.WaitingForData
-            : _text.FormatUpdatedTime(updatedAt.Value);
+        _status.Text = _usageStatus.UpdatedAt is { } updatedAt
+            ? _text.FormatUpdatedTime(updatedAt)
+            : _text.WaitingForData;
         _status.Foreground = Brush(_palette.StatusText);
     }
 
@@ -304,24 +314,20 @@ public sealed class UsageOverlayWindow : Window
         _showCodexWeekly = settings.ShowCodexWeekly;
         _codexEnabled = settings.EnableCodexUsage;
         _claudeEnabled = settings.EnableClaudeUsage;
+        _usageStatus.ApplyProviders(settings);
         _fontScale = OverlayLayoutOptions.NormalizeFontScale(settings.FontScale);
         _claudeSessionCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeSessionCardHeight, weekly: false);
         _claudeWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeWeeklyCardHeight, weekly: true);
         _codexFiveHourCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexFiveHourCardHeight, weekly: false);
         _codexWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexWeeklyCardHeight, weekly: true);
-        _codexFiveHourCard.Title.Text = text.FiveHourTitle;
-        _codexWeeklyCard.Title.Text = text.WeeklyTitle;
-        _claudeFiveHourCard.Title.Text = text.ClaudeFiveHourTitle;
-        _claudeWeeklyCard.Title.Text = text.ClaudeWeeklyTitle;
+        _codexFiveHourCard.Title.Text = text.ProgressFiveHourLabel;
+        _codexWeeklyCard.Title.Text = text.ProgressWeeklyLabel;
+        _claudeFiveHourCard.Title.Text = text.ProgressFiveHourLabel;
+        _claudeWeeklyCard.Title.Text = text.ProgressWeeklyLabel;
         _headerTitle.Text = text.CombinedUsageHeaderTitle;
         ApplyFontScale();
         ApplyCardHeights();
-        Width = Math.Max(Width, Math.Ceiling(344 * _fontScale));
-        foreach (var card in new[]
-                 { _claudeFiveHourCard, _claudeWeeklyCard, _codexFiveHourCard, _codexWeeklyCard })
-        {
-            UpdateCardResizeHint(card);
-        }
+        foreach (var kind in Enum.GetValues<UsageCardKind>()) UpdateCardResizeHint(GetCard(kind));
         ApplyCardVisibility();
         ApplySizeAndPosition(settings.Position);
         ToolTip.SetTip(_minimizeButton, text.MinimizeAction);
@@ -330,10 +336,18 @@ public sealed class UsageOverlayWindow : Window
         ToolTip.SetTip(_settingsButton, text.SettingsAction);
         ToolTip.SetTip(_refreshButton, text.RefreshAction);
         ToolTip.SetTip(_closeButton, CloseTooltip());
-        ApplyThemePalette();
+        ApplyAppearance(settings.BackgroundColor, settings.PercentageTimeSpacing, settings.LabelPercentageSpacing);
         UpdateUsage(UsageProvider.Codex, _lastCodexState);
         UpdateUsage(UsageProvider.Claude, _lastClaudeState);
-        SetStatus(_lastUpdatedAt, _lastError);
+        RenderStatus();
+    }
+
+    public void ApplyAppearance(string backgroundColor, int percentageTimeSpacing, int labelPercentageSpacing)
+    {
+        _backgroundColor = OverlayAppearanceOptions.NormalizeBackgroundColor(backgroundColor);
+        _percentageTimeSpacing = OverlayAppearanceOptions.NormalizeSpacing(percentageTimeSpacing);
+        _labelPercentageSpacing = OverlayAppearanceOptions.NormalizeLabelPercentageSpacing(labelPercentageSpacing);
+        ApplyThemePalette();
     }
 
     public void ApplyAlwaysOnTop(bool enabled)
@@ -387,6 +401,20 @@ public sealed class UsageOverlayWindow : Window
         Activate();
     }
 
+    public void ApplyPosition(string position)
+    {
+        _manualDragOrigin = null;
+        _manualDragResetTimer.Stop();
+        _customPositionSaveTimer.Stop();
+        _pendingCustomPosition = null;
+        _position = WindowPosition.Normalize(position);
+        if (_position == WindowPosition.Custom && _customPosition is null && IsVisible)
+        {
+            _customPosition = Position;
+        }
+        PositionOnPrimaryScreen();
+    }
+
     public void HideToTray()
     {
         FlushCustomPosition();
@@ -404,38 +432,10 @@ public sealed class UsageOverlayWindow : Window
             ? savedPosition
             : null;
 
-    public void ApplyPosition(string position)
-    {
-        _manualDragOrigin = null;
-        _manualDragResetTimer.Stop();
-        _customPositionSaveTimer.Stop();
-        _pendingCustomPosition = null;
-        _position = WindowPosition.Normalize(position);
-        if (_position == WindowPosition.Custom && _customPosition is null && IsVisible)
-        {
-            _customPosition = Position;
-        }
-        PositionOnPrimaryScreen();
-    }
-
     private static PixelPoint? GetCustomPosition(CompanionSettings settings) =>
         settings.CustomPositionX is { } x && settings.CustomPositionY is { } y
             ? new PixelPoint(x, y)
             : null;
-
-    private void HandleHeaderPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
-    {
-        if (!eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            return;
-        }
-
-        _manualDragOrigin = Position;
-        _manualDragResetTimer.Stop();
-        _manualDragResetTimer.Interval = TimeSpan.FromSeconds(10);
-        _manualDragResetTimer.Start();
-        BeginMoveDrag(eventArgs);
-    }
 
     private void HandlePositionChanged(object? sender, PixelPointEventArgs eventArgs)
     {
@@ -467,51 +467,6 @@ public sealed class UsageOverlayWindow : Window
 
         _pendingCustomPosition = null;
         CustomPositionChanged?.Invoke(position);
-    }
-
-    private void ApplyCardVisibility()
-    {
-        _codexFiveHourCard.Container.IsVisible = _showCodexFiveHour && _codexEnabled;
-        _codexWeeklyCard.Container.IsVisible = _showCodexWeekly && _codexEnabled;
-        _claudeFiveHourCard.Container.IsVisible = _showClaudeSession && _claudeEnabled;
-        _claudeWeeklyCard.Container.IsVisible = _showClaudeWeekly && _claudeEnabled;
-    }
-
-    private double ComputeHeight()
-    {
-        var cardHeights = new List<double>();
-        if (_codexEnabled)
-        {
-            if (_showCodexFiveHour)
-            {
-                cardHeights.Add(EffectiveCardHeight(_codexFiveHourCardHeight, weekly: false));
-            }
-            if (_showCodexWeekly)
-            {
-                cardHeights.Add(EffectiveCardHeight(_codexWeeklyCardHeight, weekly: true));
-            }
-        }
-
-        if (_claudeEnabled)
-        {
-            if (_showClaudeSession)
-            {
-                cardHeights.Add(EffectiveCardHeight(_claudeSessionCardHeight, weekly: false));
-            }
-            if (_showClaudeWeekly)
-            {
-                cardHeights.Add(EffectiveCardHeight(_claudeWeeklyCardHeight, weekly: true));
-            }
-        }
-
-        return BaseHeight + (12 * (_fontScale - 1)) + cardHeights.Sum() +
-            (CardSpacing * (cardHeights.Count + 1));
-    }
-
-    private void ApplyComputedHeight()
-    {
-        var targetHeight = ComputeHeight();
-        Height = targetHeight;
     }
 
     private double EffectiveCardHeight(double configuredHeight, bool weekly) =>
@@ -567,6 +522,7 @@ public sealed class UsageOverlayWindow : Window
 
     private void ApplyFontScale()
     {
+        foreach (var title in _providerTitles) title.FontSize = 21 * _fontScale;
         _headerTitle.FontSize = 11 * _fontScale;
         _status.FontSize = 11 * _fontScale;
         foreach (var card in new[]
@@ -586,37 +542,71 @@ public sealed class UsageOverlayWindow : Window
         AutomationProperties.SetName(card.ResizeStrip, hint);
     }
 
+    private void HandleResizeGripPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            BeginResizeDrag(WindowEdge.SouthEast, eventArgs);
+        }
+    }
+
+    private void ApplyCardVisibility()
+    {
+        _codexFiveHourCard.Container.IsVisible = _showCodexFiveHour && _codexEnabled;
+        _codexWeeklyCard.Container.IsVisible = _showCodexWeekly && _codexEnabled;
+        _claudeFiveHourCard.Container.IsVisible = _showClaudeSession && _claudeEnabled;
+        _claudeWeeklyCard.Container.IsVisible = _showClaudeWeekly && _claudeEnabled;
+        _claudeGroup.IsVisible = _claudeEnabled && (_showClaudeSession || _showClaudeWeekly);
+        _codexGroup.IsVisible = _codexEnabled && (_showCodexFiveHour || _showCodexWeekly);
+    }
+
+    private double ComputeHeight()
+    {
+        // The first call precedes construction of the content.
+        if (_root is null)
+            return 70;
+
+        var groups = new[] { _claudeGroup, _codexGroup };
+        var height = 70 + 12 * (_fontScale - 1);
+        foreach (var group in groups.Where(group => group.IsVisible))
+        {
+            group.Measure(new Size(Width - 26, double.PositiveInfinity));
+            height += group.DesiredSize.Height + CardSpacing;
+        }
+        return Math.Max(MinHeight, Math.Ceiling(height));
+    }
+
+    private void ApplyComputedHeight()
+    {
+        var targetHeight = ComputeHeight();
+        if (Math.Abs(Height - targetHeight) < 0.5)
+            return;
+
+        Height = targetHeight;
+        PositionOnPrimaryScreen();
+        Dispatcher.UIThread.Post(CompletePendingReposition, DispatcherPriority.Loaded);
+    }
+
     private void ApplySizeAndPosition(string position)
     {
-        _manualDragOrigin = null;
-        _manualDragResetTimer.Stop();
-        _customPositionSaveTimer.Stop();
-        _pendingCustomPosition = null;
-        _position = WindowPosition.Normalize(position);
-        _repositionAfterResize = true;
+        ApplyPosition(position);
         ApplyComputedHeight();
         PositionOnPrimaryScreen();
         Dispatcher.UIThread.Post(
             CompletePendingReposition,
-            DispatcherPriority.Background);
+            DispatcherPriority.Loaded);
     }
 
     private void HandleWindowSizeChanged(object? sender, SizeChangedEventArgs eventArgs)
     {
-        if (_repositionAfterResize)
-        {
-            PositionOnPrimaryScreen();
-        }
+        // Native resize events can arrive after the settings/layout callback.
+        // Keep the configured anchor whenever the content changes the size.
+        PositionOnPrimaryScreen();
     }
 
     private void CompletePendingReposition()
     {
-        if (!_repositionAfterResize)
-        {
-            return;
-        }
-
-        _repositionAfterResize = false;
+        // Native layout may complete after a requested content resize.
         PositionOnPrimaryScreen();
     }
 
@@ -625,8 +615,7 @@ public sealed class UsageOverlayWindow : Window
         var grid = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto,Auto,Auto,Auto"),
-            Height = 26,
-            Background = Brushes.Transparent
+            Height = 26
         };
         _headerTitle = new TextBlock
         {
@@ -638,6 +627,8 @@ public sealed class UsageOverlayWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
+        _headerTitle.PointerPressed += HandleHeaderPointerPressed;
+
         _shortcutsButton = HeaderButton("?", _text.ShortcutsAction);
         _shortcutsButton.Click += (_, _) => ShortcutsRequested?.Invoke(this, EventArgs.Empty);
         Grid.SetColumn(_shortcutsButton, 1);
@@ -667,30 +658,13 @@ public sealed class UsageOverlayWindow : Window
         _closeButton.Click += (_, _) => Close();
         Grid.SetColumn(_closeButton, 6);
 
-        var dragArea = new Border
-        {
-            Background = Brushes.Transparent,
-            Child = _headerTitle
-        };
-        dragArea.PointerPressed += HandleHeaderPointerPressed;
-        dragArea.PointerReleased += (_, _) =>
-        {
-            _manualDragResetTimer.Stop();
-            _manualDragResetTimer.Interval = TimeSpan.FromSeconds(1);
-            _manualDragResetTimer.Start();
-        };
-        grid.Children.Add(dragArea);
+        grid.Children.Add(_headerTitle);
         grid.Children.Add(_shortcutsButton);
         grid.Children.Add(_pinButton);
         grid.Children.Add(_settingsButton);
         grid.Children.Add(_refreshButton);
         grid.Children.Add(_minimizeButton);
         grid.Children.Add(_closeButton);
-        foreach (var button in new Control[]
-                 { _shortcutsButton, _pinButton, _settingsButton, _refreshButton, _minimizeButton, _closeButton })
-        {
-            WindowDecorationProperties.SetElementRole(button, WindowDecorationsElementRole.User);
-        }
         return grid;
     }
 
@@ -753,14 +727,8 @@ public sealed class UsageOverlayWindow : Window
         var canvas = new Canvas { Width = 512, Height = 509.64 };
         canvas.Children.Add(new Avalonia.Controls.Shapes.Path
         {
-            Data = Geometry.Parse(
-                "M115.612 0h280.775C459.974 0 512 52.026 512 115.612v278.415c0 63.587-52.026 115.612-115.613 115.612H115.612C52.026 509.639 0 457.614 0 394.027V115.612C0 52.026 52.026 0 115.612 0z"),
-            Fill = Brush(ClaudeIconBackground)
-        });
-        canvas.Children.Add(new Avalonia.Controls.Shapes.Path
-        {
             Data = Geometry.Parse(ClaudeIconPath),
-            Fill = Brush(ClaudeIconForeground)
+            Fill = Brush(ClaudeIconBackground)
         });
         return new Viewbox { Width = IconSize, Height = IconSize, Child = canvas };
     }
@@ -776,60 +744,73 @@ public sealed class UsageOverlayWindow : Window
         return new Viewbox { Width = IconSize, Height = IconSize, Child = canvas };
     }
 
-    private UsageCardControls CreateCard(
-        UsageCardKind kind,
-        string title,
-        Func<Control> createIcon,
-        bool showDetails)
+    private Border CreateProviderGroup(string name, Func<Control> createIcon,
+        UsageCardControls session, UsageCardControls weekly)
+    {
+        var title = new TextBlock
+        {
+            Text = name, FontSize = 21, FontWeight = FontWeight.SemiBold,
+            FontFamily = new FontFamily("Georgia, Noto Serif, serif"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _providerTitles.Add(title);
+        var heading = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 9,
+            Margin = new Thickness(0, 0, 0, 10),
+            Children = { createIcon(), title }
+        };
+        return new Border
+        {
+            BorderThickness = new Thickness(0),
+            Child = new StackPanel { Children = { heading, session.Container, weekly.Container } }
+        };
+    }
+
+    private UsageCardControls CreateCard(UsageCardKind kind, string title, bool showDetails)
     {
         var container = new Border
         {
             Height = EffectiveCardHeight(GetConfiguredCardHeight(kind), showDetails),
             Background = Brush("#FF353835"),
             BorderBrush = Brush("#FF4A4E4A"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(11),
-            Padding = new Thickness(11, 8)
+            BorderThickness = new Thickness(0),
+            Margin = new Thickness(0, 0, 0, 6)
         };
         var grid = new Grid
         {
-            RowDefinitions = showDetails
-                ? new RowDefinitions("Auto,Auto,*,Auto")
-                : new RowDefinitions("Auto,Auto,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
             ColumnDefinitions = new ColumnDefinitions("*,Auto")
         };
-        var icon = createIcon();
-        icon.VerticalAlignment = VerticalAlignment.Center;
-        icon.Margin = new Thickness(0, 0, 6, 0);
+
         var titleText = new TextBlock
         {
             Text = title,
             Foreground = Brush("#F4F5F3"),
             FontSize = 14,
-            FontWeight = FontWeight.SemiBold,
+            FontWeight = FontWeight.Medium,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 8, 0),
             TextTrimming = TextTrimming.CharacterEllipsis
         };
-        var titleRow = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*")
-        };
-        Grid.SetColumn(icon, 0);
-        Grid.SetColumn(titleText, 1);
-        titleRow.Children.Add(icon);
-        titleRow.Children.Add(titleText);
         var remaining = new TextBlock
         {
             Foreground = Brush("#9CA09C"),
-            FontSize = 13,
-            FontWeight = FontWeight.Bold,
-            VerticalAlignment = VerticalAlignment.Center
+            FontSize = 14,
+            FontWeight = FontWeight.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
-        Grid.SetColumn(remaining, 1);
         var reset = new TextBlock
         {
             Foreground = Brush("#B7BAB6"),
-            FontSize = 11.5,
-            Margin = new Thickness(0, 1, 0, 3)
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
         Grid.SetRow(reset, 1);
         Grid.SetColumnSpan(reset, 2);
@@ -838,9 +819,9 @@ public sealed class UsageOverlayWindow : Window
             Foreground = Brush("#B7BAB6"),
             FontSize = 11,
             Margin = new Thickness(0, 4, 0, 0),
-            IsVisible = showDetails
+            IsVisible = false
         };
-        Grid.SetRow(details, 3);
+        Grid.SetRow(details, 2);
         Grid.SetColumnSpan(details, 2);
 
         var bar = new Grid
@@ -855,18 +836,18 @@ public sealed class UsageOverlayWindow : Window
             var fill = new Border
             {
                 Width = 0,
-                Height = 9,
+                Opacity = 0.35,
+                Height = 36,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                CornerRadius = new CornerRadius(2.5)
+                CornerRadius = new CornerRadius(0)
             };
             var cell = new Border
             {
-                Height = 9,
+                Height = 36,
                 Background = Brush("#FF4A4D49"),
-                CornerRadius = new CornerRadius(2.5),
+                CornerRadius = new CornerRadius(0),
                 Child = fill,
-                ClipToBounds = true,
-                Margin = new Thickness(0, 0, index == fills.Length - 1 ? 0 : 5, 0)
+                ClipToBounds = true
             };
             cells[index] = cell;
             fills[index] = fill;
@@ -874,13 +855,34 @@ public sealed class UsageOverlayWindow : Window
             bar.Children.Add(cell);
         }
 
-        Grid.SetRow(bar, 2);
-        Grid.SetColumnSpan(bar, 2);
-        grid.Children.Add(titleRow);
-        grid.Children.Add(remaining);
-        grid.Children.Add(reset);
-        grid.Children.Add(details);
-        grid.Children.Add(bar);
+        var resetIcon = new TextBlock
+        {
+            Text = "↻",
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+            Opacity = 0
+        };
+        var labels = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,100,16,180"),
+            Children = { titleText, remaining, resetIcon, reset }
+        };
+        Grid.SetColumn(remaining, 1);
+        Grid.SetRow(reset, 0);
+        Grid.SetColumn(resetIcon, 2);
+        Grid.SetColumn(reset, 3);
+        Grid.SetColumnSpan(reset, 1);
+        var progress = new Border
+        {
+            Height = 36,
+            CornerRadius = new CornerRadius(6),
+            ClipToBounds = true,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Child = new Grid { Children = { bar, labels } }
+        };
+        Grid.SetRow(progress, 0);
+        Grid.SetColumnSpan(progress, 2);
+        grid.Children.Add(progress);
         var resizeMark = new Border
         {
             Width = 28,
@@ -960,23 +962,46 @@ public sealed class UsageOverlayWindow : Window
             eventArgs.Handled = true;
         };
         resizeStrip.PointerCaptureLost += (_, _) => dragging = false;
-        var card = new UsageCardControls(
-            container,
-            titleText,
-            remaining,
-            reset,
-            details,
-            cells,
-            fills,
-            resizeStrip);
+        var card = new UsageCardControls(container, titleText, remaining, reset,
+            resetIcon, details, labels, cells, fills, resizeStrip);
         UpdateCardResizeHint(card);
-        for (var index = 0; index < cells.Length; index++)
-        {
-            var cellIndex = index;
-            cells[index].SizeChanged += (_, _) =>
-                fills[cellIndex].Width = cells[cellIndex].Bounds.Width * card.FillRatios[cellIndex];
-        }
+        foreach (var cell in cells) cell.SizeChanged += (_, _) => UpdateBarFillWidths(card);
         return card;
+    }
+
+    private void FitResetColumns()
+    {
+        var cards = new[] { _claudeFiveHourCard, _claudeWeeklyCard,
+            _codexFiveHourCard, _codexWeeklyCard };
+        var resetWidth = 0d;
+        var labelWidth = 0d;
+        foreach (var card in cards)
+        {
+            var group = card == _claudeFiveHourCard || card == _claudeWeeklyCard
+                ? _claudeGroup : _codexGroup;
+            if (!group.IsVisible || !card.Container.IsVisible)
+                continue;
+
+            card.Reset.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            card.Title.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            resetWidth = Math.Max(resetWidth, card.Reset.DesiredSize.Width);
+            labelWidth = Math.Max(labelWidth, card.Title.DesiredSize.Width);
+        }
+
+        var labelColumnWidth = Math.Ceiling(labelWidth) + _labelPercentageSpacing;
+        var resetColumnWidth = Math.Min(Math.Ceiling(resetWidth), 228);
+        var targetWidth = Math.Max(280, 26 + labelColumnWidth + 92 + _percentageTimeSpacing + 16 + resetColumnWidth);
+        if (Width < targetWidth)
+        {
+            Width = targetWidth;
+            PositionOnPrimaryScreen();
+        }
+        foreach (var card in cards)
+        {
+            card.Labels.ColumnDefinitions[0].Width = new GridLength(labelColumnWidth);
+            card.Labels.ColumnDefinitions[3].Width = new GridLength(resetColumnWidth);
+
+        }
     }
 
     private void UpdateCard(
@@ -985,6 +1010,7 @@ public sealed class UsageOverlayWindow : Window
         bool weekly,
         bool dataAvailable)
     {
+        card.ResetIcon.Opacity = state?.ResetsAt is not null ? 1 : 0;
         if (state is null)
         {
             card.Remaining.Text = _text.RemainingUnavailable;
@@ -993,11 +1019,9 @@ public sealed class UsageOverlayWindow : Window
             return;
         }
 
-        card.Remaining.Text = _text.FormatRemaining(state.RemainingPercent);
+        card.Remaining.Text = $"{Math.Clamp(state.RemainingPercent, 0, 100)}%";
         card.Reset.Text = state.ResetsAt is long unixSeconds
-            ? weekly
-                ? _text.FormatWeeklyReset(DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime())
-                : _text.FormatFiveHourReset(DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime())
+            ? _text.FormatProgressReset(DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime())
             : _text.ResetUnavailable;
         ApplyBar(card, state.RemainingPercent, UsagePresentation.GetSignal(state.RemainingPercent));
     }
@@ -1006,7 +1030,7 @@ public sealed class UsageOverlayWindow : Window
     {
         var color = SignalBrush(signal);
         var ratios = UsagePresentation.GetCellFillRatios(remainingPercent);
-        card.Remaining.Foreground = color;
+        card.Remaining.Foreground = Brush(_palette.CardTitle);
         card.FillRatios = ratios;
         for (var index = 0; index < card.Fills.Length; index++)
         {
@@ -1023,12 +1047,18 @@ public sealed class UsageOverlayWindow : Window
         }
     }
 
-    private void HandleResizeGripPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
+    private void HandleHeaderPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
-        if (eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        if (!eventArgs.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            BeginResizeDrag(WindowEdge.SouthEast, eventArgs);
+            return;
         }
+
+        _manualDragOrigin = Position;
+        _manualDragResetTimer.Stop();
+        _manualDragResetTimer.Interval = TimeSpan.FromSeconds(10);
+        _manualDragResetTimer.Start();
+        BeginMoveDrag(eventArgs);
     }
 
     private void PositionOnPrimaryScreen()
@@ -1082,7 +1112,7 @@ public sealed class UsageOverlayWindow : Window
         _palette = ActualThemeVariant == ThemeVariant.Light
             ? OverlayThemePalette.Light
             : OverlayThemePalette.Dark;
-        _root.Background = Brush(_palette.RootBackground);
+        _root.Background = Brush(string.IsNullOrEmpty(_backgroundColor) ? _palette.RootBackground : _backgroundColor);
         _root.BorderBrush = Brush(_palette.RootBorder);
         _root.BoxShadow = new BoxShadows(new BoxShadow
         {
@@ -1091,21 +1121,39 @@ public sealed class UsageOverlayWindow : Window
             Color = Color.Parse(_palette.Shadow)
         });
         _headerTitle.Foreground = Brush(_palette.HeaderForeground);
+        foreach (var group in new[] { _claudeGroup, _codexGroup })
+        {
+            group.Background = Brushes.Transparent;
+            group.BorderBrush = Brush(_palette.CardBorder);
+        }
+        foreach (var title in _providerTitles)
+            title.Foreground = Brush(_palette.CardTitle);
+        foreach (var button in new Button[] { _shortcutsButton, _pinButton, _settingsButton,
+            _refreshButton, _minimizeButton, _closeButton })
+        {
+            button.Background = Brushes.Transparent;
+            button.BorderThickness = new Thickness(0);
+            button.Foreground = Brush(_palette.SecondaryText);
+        }
         ApplyCardTheme(_codexFiveHourCard);
         ApplyCardTheme(_codexWeeklyCard);
         ApplyCardTheme(_claudeFiveHourCard);
         ApplyCardTheme(_claudeWeeklyCard);
-        SetStatus(_lastUpdatedAt, _lastError);
+        RenderStatus();
         UpdateUsage(UsageProvider.Codex, _lastCodexState);
         UpdateUsage(UsageProvider.Claude, _lastClaudeState);
     }
 
     private void ApplyCardTheme(UsageCardControls card)
     {
-        card.Container.Background = Brush(_palette.CardBackground);
+        card.Container.Margin = new Thickness(0, 0, 0, 6);
+        card.Container.Background = Brushes.Transparent;
         card.Container.BorderBrush = Brush(_palette.CardBorder);
+        card.Labels.ColumnDefinitions[1].Width = new GridLength(92 + _percentageTimeSpacing);
+        card.Remaining.Margin = new Thickness(0, 0, _percentageTimeSpacing, 0);
         card.Title.Foreground = Brush(_palette.CardTitle);
         card.Reset.Foreground = Brush(_palette.SecondaryText);
+        card.ResetIcon.Foreground = Brush(_palette.SecondaryText);
         card.Details.Foreground = Brush(_palette.SecondaryText);
         foreach (var cell in card.Cells)
         {
@@ -1129,7 +1177,9 @@ public sealed class UsageOverlayWindow : Window
         TextBlock Title,
         TextBlock Remaining,
         TextBlock Reset,
+        TextBlock ResetIcon,
         TextBlock Details,
+        Grid Labels,
         Border[] Cells,
         Border[] Fills,
         Border ResizeStrip)

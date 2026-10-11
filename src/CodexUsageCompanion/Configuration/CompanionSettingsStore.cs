@@ -171,6 +171,9 @@ public static class CompanionSettingsStore
             ClaudeWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeWeeklyCardHeight, weekly: true),
             CodexFiveHourCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexFiveHourCardHeight, weekly: false),
             CodexWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.CodexWeeklyCardHeight, weekly: true),
+            BackgroundColor = OverlayAppearanceOptions.NormalizeBackgroundColor(settings.BackgroundColor),
+            PercentageTimeSpacing = OverlayAppearanceOptions.NormalizeSpacing(settings.PercentageTimeSpacing),
+            LabelPercentageSpacing = OverlayAppearanceOptions.NormalizeLabelPercentageSpacing(settings.LabelPercentageSpacing),
             TrayIconStyle = TrayIconStyleOptions.Normalize(settings.TrayIconStyle),
             LowUsageAlertThresholdPercent = UsageAlertOptions.NormalizeThreshold(
                 settings.LowUsageAlertThresholdPercent),

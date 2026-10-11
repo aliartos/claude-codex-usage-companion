@@ -493,6 +493,55 @@ public sealed record UiText(
         _ => "Keep editing"
     };
 
+    public string BackgroundColorOption => Language switch
+    {
+        UiLanguage.TraditionalChinese => "背景顏色（#RRGGBB 或 #AARRGGBB）",
+        UiLanguage.SimplifiedChinese => "背景颜色（#RRGGBB 或 #AARRGGBB）",
+        _ => "Background color (#RRGGBB or #AARRGGBB)"
+    };
+
+    public string ThemeDefaultColor => Language switch
+    {
+        UiLanguage.TraditionalChinese => "留白以使用佈景主題預設顏色",
+        UiLanguage.SimplifiedChinese => "留空以使用主题默认颜色",
+        _ => "Leave blank to use the theme color"
+    };
+
+    public string InvalidBackgroundColor => Language switch
+    {
+        UiLanguage.TraditionalChinese => "請輸入 #RRGGBB 或 #AARRGGBB，或留白。",
+        UiLanguage.SimplifiedChinese => "请输入 #RRGGBB 或 #AARRGGBB，或留空。",
+        _ => "Enter #RRGGBB or #AARRGGBB, or leave blank."
+    };
+
+    public string LabelPercentageSpacingOption => Language switch
+    {
+        UiLanguage.TraditionalChinese => "5h／每週標籤與百分比的間距（像素）",
+        UiLanguage.SimplifiedChinese => "5h／每周标签与百分比的间距（像素）",
+        _ => "Gap between 5h/Weekly and percentage (pixels)"
+    };
+
+    public string PercentageTimeSpacingOption => Language switch
+    {
+        UiLanguage.TraditionalChinese => "百分比與重置時間的間距（像素）",
+        UiLanguage.SimplifiedChinese => "百分比与重置时间的间距（像素）",
+        _ => "Gap between percentage and reset time (pixels)"
+    };
+
+    public string ProgressFiveHourLabel => Language switch
+    {
+        UiLanguage.TraditionalChinese => "5h",
+        UiLanguage.SimplifiedChinese => "5h",
+        _ => "5h"
+    };
+
+    public string ProgressWeeklyLabel => Language switch
+    {
+        UiLanguage.TraditionalChinese => "週",
+        UiLanguage.SimplifiedChinese => "周",
+        _ => "Weekly"
+    };
+
     public string ClaudeFiveHourTitle => Language switch
     {
         UiLanguage.TraditionalChinese => "目前工作階段",
@@ -768,6 +817,20 @@ public sealed record UiText(
         }
 
         return FiveHourTitle;
+    }
+
+    public string FormatProgressReset(DateTimeOffset localReset)
+    {
+        var dateTime = ResetDateTimeFormat is DateTimeFormatOptions.MonthDay or DateTimeFormatOptions.MonthDayTime
+            ? localReset.ToString("MM/dd HH:mm", CultureInfo.InvariantCulture)
+            : FormatDateTime(localReset, ResetDateTimeFormat);
+        var localLabel = Language switch
+        {
+            UiLanguage.TraditionalChinese => "本機",
+            UiLanguage.SimplifiedChinese => "本机",
+            _ => "Local"
+        };
+        return $"{dateTime} {localLabel}";
     }
 
     private string FormatResetDateTime(DateTimeOffset localReset)

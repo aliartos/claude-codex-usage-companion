@@ -16,7 +16,7 @@ git pull --ff-only origin main
 git status --short
 
 bash "$ROOT/scripts/build-linux.sh"
-sha256sum -c artifacts/SHA256SUMS
+sha256sum -c "$ROOT/artifacts/SHA256SUMS"
 
 git tag -a "$VERSION" -m "Claude Codex Usage Companion $VERSION" -m "$NOTES"
 git push origin "$VERSION"

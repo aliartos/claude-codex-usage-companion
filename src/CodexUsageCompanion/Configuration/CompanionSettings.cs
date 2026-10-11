@@ -27,6 +27,9 @@ public sealed record CompanionSettings
     public double ClaudeWeeklyCardHeight { get; init; } = OverlayLayoutOptions.WeeklyCardHeight;
     public double CodexFiveHourCardHeight { get; init; } = OverlayLayoutOptions.FiveHourCardHeight;
     public double CodexWeeklyCardHeight { get; init; } = OverlayLayoutOptions.WeeklyCardHeight;
+    public string BackgroundColor { get; init; } = string.Empty;
+    public int PercentageTimeSpacing { get; init; } = OverlayAppearanceOptions.DefaultSpacing;
+    public int LabelPercentageSpacing { get; init; } = OverlayAppearanceOptions.DefaultLabelPercentageSpacing;
     public bool EnableLowUsageAlert { get; init; }
     public int LowUsageAlertThresholdPercent { get; init; } =
         UsageAlertOptions.DefaultThresholdPercent;

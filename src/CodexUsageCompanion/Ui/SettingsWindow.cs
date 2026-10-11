@@ -1,7 +1,7 @@
 using System.Reflection;
 using Avalonia;
-using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Automation;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -37,6 +37,10 @@ public sealed class SettingsWindow : Window
     private readonly Slider _fontSizeSlider;
     private readonly TextBlock _fontSizeValue;
     private readonly TextBlock _fontSizePreview;
+    private readonly TextBox _backgroundColor;
+    private readonly TextBlock _backgroundColorStatus;
+    private readonly NumericUpDown _percentageTimeSpacing;
+    private readonly NumericUpDown _labelPercentageSpacing;
     private readonly ComboBox _position;
     private readonly ComboBox _updateInterval;
     private readonly ComboBox _resetDateTimeFormat;
@@ -233,6 +237,31 @@ public sealed class SettingsWindow : Window
         };
         _fontSizeSlider.ValueChanged += (_, _) => UpdateFontSizePreview();
         UpdateFontSizePreview();
+        _backgroundColor = new TextBox
+        {
+            Text = settings.BackgroundColor,
+            PlaceholderText = text.ThemeDefaultColor,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        _backgroundColorStatus = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap };
+        _percentageTimeSpacing = new NumericUpDown
+        {
+            Value = OverlayAppearanceOptions.NormalizeSpacing(settings.PercentageTimeSpacing),
+            Minimum = 0,
+            Maximum = OverlayAppearanceOptions.MaximumSpacing,
+            Increment = 1,
+            FormatString = "0",
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        _labelPercentageSpacing = new NumericUpDown
+        {
+            Value = OverlayAppearanceOptions.NormalizeLabelPercentageSpacing(settings.LabelPercentageSpacing),
+            Minimum = 0,
+            Maximum = 300,
+            Increment = 1,
+            FormatString = "0",
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
         _position = new ComboBox
         {
             ItemsSource = WindowPosition.Values,
@@ -457,19 +486,45 @@ public sealed class SettingsWindow : Window
         var options = new StackPanel
         {
             Spacing = 12,
-            Margin = new Thickness(0, 0, 18, 0),
             Children =
             {
-                CreateSectionHeader(text.WindowSettingsGroup, first: true),
-                _systemTray,
-                trayIconStyleLabel,
-                _trayIconStyle,
-                _showTaskbarIcon,
-                _startOnBoot,
-                _minimizeOnStart,
-                _alwaysOnTop,
-                CreateSeparator(),
-                CreateSectionHeader(text.UsageSettingsGroup),
+                CreateSection(text.AppearanceSettingsGroup,
+                languageLabel,
+                _language,
+                themeLabel,
+                _theme,
+                fontSizeLabel, fontSizeControls, fontSizePreviewBorder,
+                new TextBlock { Text = text.BackgroundColorOption, Margin = new Thickness(0, 8, 0, 4) },
+                _backgroundColor,
+                _backgroundColorStatus,
+                new TextBlock { Text = text.LabelPercentageSpacingOption, Margin = new Thickness(0, 8, 0, 4) },
+                _labelPercentageSpacing,
+                new TextBlock { Text = text.PercentageTimeSpacingOption, Margin = new Thickness(0, 8, 0, 4) },
+                _percentageTimeSpacing,
+                positionLabel,
+                _position
+                ),
+                CreateSection(text.DateTimeSettingsGroup,
+                resetDateTimeFormatLabel,
+                _resetDateTimeFormat,
+                _resetDateTimeFormatStatus,
+                lastUpdatedDateTimeFormatLabel,
+                _lastUpdatedDateTimeFormat,
+                _lastUpdatedDateTimeFormatStatus
+                ),
+                CreateSection(text.LoggingSettingsGroup,
+                _usageLogging,
+                usageLogFilePathLabel,
+                _usageLogFilePath,
+                usageLogFormatLabel,
+                _usageLogFormat),
+                CreateSection(text.NotificationSettingsGroup,
+                _lowUsageAlert,
+                lowUsageAlertThresholdLabel,
+                _lowUsageAlertThreshold,
+                _notifyOnReset
+                ),
+                CreateSection(text.UsageSettingsGroup,
                 _enableClaudeUsage,
                 _enableCodexUsage,
                 displayedLimitsLabel,
@@ -478,39 +533,17 @@ public sealed class SettingsWindow : Window
                 _showCodexFiveHour,
                 _showCodexWeekly,
                 updateIntervalLabel,
-                _updateInterval,
-                CreateSeparator(),
-                CreateSectionHeader(text.AppearanceSettingsGroup),
-                languageLabel,
-                _language,
-                themeLabel,
-                _theme,
-                fontSizeLabel,
-                fontSizeControls,
-                fontSizePreviewBorder,
-                positionLabel,
-                _position,
-                CreateSeparator(),
-                CreateSectionHeader(text.NotificationSettingsGroup),
-                _lowUsageAlert,
-                lowUsageAlertThresholdLabel,
-                _lowUsageAlertThreshold,
-                _notifyOnReset,
-                CreateSeparator(),
-                CreateSectionHeader(text.DateTimeSettingsGroup),
-                resetDateTimeFormatLabel,
-                _resetDateTimeFormat,
-                _resetDateTimeFormatStatus,
-                lastUpdatedDateTimeFormatLabel,
-                _lastUpdatedDateTimeFormat,
-                _lastUpdatedDateTimeFormatStatus,
-                CreateSeparator(),
-                CreateSectionHeader(text.LoggingSettingsGroup),
-                _usageLogging,
-                usageLogFilePathLabel,
-                _usageLogFilePath,
-                usageLogFormatLabel,
-                _usageLogFormat
+                _updateInterval
+                ),
+                CreateSection(text.WindowSettingsGroup,
+                _systemTray,
+                trayIconStyleLabel,
+                _trayIconStyle,
+                _showTaskbarIcon,
+                _startOnBoot,
+                _minimizeOnStart,
+                _alwaysOnTop
+                )
             }
         };
         var optionsScroller = new ScrollViewer
@@ -540,13 +573,24 @@ public sealed class SettingsWindow : Window
         UpdateDisplayedLimitControls();
         UpdateDateTimeFormatValidation();
         _initialSettings = CaptureSettings();
+        _backgroundColor.TextChanged += (_, _) => PreviewAppearance();
+        _percentageTimeSpacing.ValueChanged += (_, _) => PreviewAppearance();
+        _labelPercentageSpacing.ValueChanged += (_, _) => PreviewAppearance();
         AddHandler(KeyDownEvent, HandleKeyDown, RoutingStrategies.Tunnel);
         Closing += HandleClosing;
     }
 
     public event Action<string>? PositionPreviewRequested;
+    public event Action<string, int, int>? AppearancePreviewRequested;
 
     public event Func<CompanionSettings, bool>? ApplyRequested;
+
+    private void UpdateFontSizePreview()
+    {
+        var scale = OverlayLayoutOptions.NormalizeFontScale(_fontSizeSlider.Value / 100);
+        _fontSizeValue.Text = $"{scale * 100:0}%";
+        _fontSizePreview.FontSize = 14 * scale;
+    }
 
     private void HandleKeyDown(object? sender, KeyEventArgs eventArgs)
     {
@@ -710,6 +754,9 @@ public sealed class SettingsWindow : Window
             Language = (_language.SelectedItem as LanguageChoice)?.Value ?? "en-US",
             Theme = (_theme.SelectedItem as ThemeChoice)?.Value ?? UiThemeOptions.System,
             FontScale = OverlayLayoutOptions.NormalizeFontScale(_fontSizeSlider.Value / 100),
+            BackgroundColor = OverlayAppearanceOptions.NormalizeBackgroundColor(_backgroundColor.Text),
+            PercentageTimeSpacing = (int)(_percentageTimeSpacing.Value ?? OverlayAppearanceOptions.DefaultSpacing),
+            LabelPercentageSpacing = (int)(_labelPercentageSpacing.Value ?? OverlayAppearanceOptions.DefaultLabelPercentageSpacing),
             Position = _position.SelectedItem as string ?? WindowPosition.RightBottom,
             RefreshIntervalSeconds =
                 (_updateInterval.SelectedItem as UpdateIntervalChoice)?.Seconds ??
@@ -726,13 +773,6 @@ public sealed class SettingsWindow : Window
             UsageLogFormat =
                 _usageLogFormat.SelectedItem as string ?? UsageLogOptions.Csv
         };
-    }
-
-    private void UpdateFontSizePreview()
-    {
-        var scale = OverlayLayoutOptions.NormalizeFontScale(_fontSizeSlider.Value / 100);
-        _fontSizeValue.Text = $"{scale * 100:0}%";
-        _fontSizePreview.FontSize = 14 * scale;
     }
 
     private void UpdateUsageLoggingControls()
@@ -785,6 +825,15 @@ public sealed class SettingsWindow : Window
         UpdateDateTimeFormatValidation();
     }
 
+    private void PreviewAppearance()
+    {
+        UpdateDateTimeFormatValidation();
+        if (OverlayAppearanceOptions.IsValidBackgroundColor(_backgroundColor.Text))
+            AppearancePreviewRequested?.Invoke(_backgroundColor.Text ?? string.Empty,
+                (int)(_percentageTimeSpacing.Value ?? OverlayAppearanceOptions.DefaultSpacing),
+                (int)(_labelPercentageSpacing.Value ?? OverlayAppearanceOptions.DefaultLabelPercentageSpacing));
+    }
+
     private bool UpdateDateTimeFormatValidation()
     {
         var sample = new DateTimeOffset(
@@ -803,7 +852,10 @@ public sealed class SettingsWindow : Window
             CurrentFormat(_lastUpdatedDateTimeFormat),
             _lastUpdatedDateTimeFormatStatus,
             sample);
-        _save.IsEnabled = resetValid && lastUpdatedValid;
+        var colorValid = OverlayAppearanceOptions.IsValidBackgroundColor(_backgroundColor.Text);
+        _backgroundColorStatus.Text = colorValid ? string.Empty : _text.InvalidBackgroundColor;
+        _backgroundColorStatus.Foreground = Brushes.IndianRed;
+        _save.IsEnabled = resetValid && lastUpdatedValid && colorValid;
         _apply.IsEnabled = _save.IsEnabled;
         return _save.IsEnabled;
     }
@@ -830,25 +882,28 @@ public sealed class SettingsWindow : Window
         return (comboBox.Text ?? comboBox.SelectedItem as string ?? string.Empty).Trim();
     }
 
-    private static TextBlock CreateSectionHeader(string text, bool first = false)
+    private static Expander CreateSection(string title, params Control[] controls)
     {
-        return new TextBlock
+        var content = new StackPanel
         {
-            Text = text,
-            FontWeight = FontWeight.Bold,
-            FontSize = 15,
-            Margin = new Thickness(0, first ? 0 : 4, 0, 0)
+            Spacing = 12,
+            Margin = new Thickness(0, 8, 0, 8)
         };
-    }
+        foreach (var control in controls)
+            content.Children.Add(control);
 
-    private static Border CreateSeparator()
-    {
-        return new Border
+        return new Expander
         {
-            Height = 1,
-            Background = Brushes.Gray,
-            Opacity = 0.35,
-            Margin = new Thickness(0, 4)
+            Header = new TextBlock
+            {
+                Text = title,
+                FontWeight = FontWeight.Bold,
+                FontSize = 15
+            },
+            IsExpanded = true,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Content = content
         };
     }
 

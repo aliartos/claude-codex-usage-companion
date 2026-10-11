@@ -4,12 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.3] - Pending release
+## [0.1.3] - 2026-10-12
 
 ### Added
 
 - Window movement and resizing on Wayland desktops, per-card vertical resizing, and a font-size slider with preview.
 - A `custom` window position that saves coordinates after dragging the app window and restores them at launch.
+
+- Custom panel background colors with optional alpha transparency, live preview, validation, and a theme-color fallback.
+- Configurable horizontal spacing between the 5h/Weekly labels and percentages (default 16 pixels), and between percentages and reset times (default 8 pixels).
+- Collapsible settings sections ordered A–Z: Appearance, Date and time, Logging, Notifications, Usage, and Window and startup.
 
 ### Fixed
 
@@ -18,11 +22,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Apply the selected window position at startup and on settings changes through XWayland when available; use the primary monitor bounds for correct placement on mixed-size displays.
 - Restore the last on-screen position after hiding the window to the tray.
 - Restrict replacement Claude credentials files to owner access during token refresh.
+- Panel positioning now follows its configured screen anchor after provider visibility and content-size changes, including delayed native resize events.
+- Disabled providers stop polling and their pending results no longer display stale errors. Re-enabling a provider resumes refreshing without restarting the app.
+- Provider errors are tracked independently: a successful Codex refresh no longer clears an active Claude error. Hiding Claude bars preserves its errors; disabling Claude usage clears them.
+- Removed extra right-side spacing from the settings list.
 - Claude usage no longer stalls at "Waiting for usage data" after a login autostart. The stored OAuth access token expires after a few hours and the Claude CLI renews it only while the CLI itself runs, so following a reboot the companion was reading an expired token and reporting "Claude session expired" until the user happened to open Claude Code. It now renews the token itself through the same OAuth refresh grant the CLI uses, and also retries once when the server rejects a token that has not reached its recorded expiry.
 
 ### Changed
 
 - Updated Avalonia dependencies to 12.1.3 and synchronized application, plugin, widget, and release artifact versions.
+- Redesigned the overlay with QuotaGem-inspired provider headings and compact rounded progress bars containing the usage label, remaining percentage, reset icon, and local reset time.
+- Aligned percentage and reset/status columns across providers. The panel fits its content and selected spacing; weekly credit details are available in tooltips.
+- Updated dark and light colors and simplified the toolbar styling.
 - The companion now writes to `~/.claude/.credentials.json` when it renews a token. The write is atomic, stays owner-readable only, preserves every field the app does not own, and takes the same lock file the Claude CLI uses so the two never rotate the refresh token at once. Tokens are still never logged.
 
 ## [0.1.2] - 2026-08-10
@@ -93,6 +104,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No telemetry. This app never stores or writes authentication tokens of its own; when Claude usage is enabled, it reads the OAuth access token Claude Code already stores locally and sends it only to Anthropic's official API over HTTPS.
 
+[0.1.3]: https://github.com/ychsieh95/claude-codex-usage-companion/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ychsieh95/claude-codex-usage-companion/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ychsieh95/claude-codex-usage-companion/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ychsieh95/claude-codex-usage-companion/releases/tag/v0.1.0
