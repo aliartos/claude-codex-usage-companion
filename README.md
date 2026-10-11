@@ -11,9 +11,17 @@ Claude Codex Usage Companion is a local, open-source usage monitor for Claude Co
 - English, Traditional Chinese, and Simplified Chinese usage text.
 - A categorized settings window for language, theme, window position, usage alerts, reset notifications, usage logging, taskbar and system-tray icons, login autostart, and always-on-top behavior.
 - Four system-tray icon styles: the original icon, Claude current-session remaining, Claude weekly remaining, or Codex session remaining.
-- No telemetry and no authentication tokens stored by this app.
+- No telemetry; existing Claude credentials are renewed in place and tokens are never logged.
 
 This Linux port is based on [gkfriend/codex-usage-companion](https://github.com/gkfriend/codex-usage-companion), whose original implementation targets Windows/WPF.
+
+## v0.1.3
+
+The panel now uses [QuotaGem](https://github.com/gyozalab/QuotaGem)-inspired provider headings and rounded bars, with the 5h/Weekly label, remaining percentage, and local reset time on one row. The columns stay aligned, and the panel fits its content and remains at the configured screen position when providers are hidden. Hover over a weekly bar to see credit details.
+
+Settings sections are collapsible and ordered A–Z. Under **Appearance**, configure the background color (`#RRGGBB` or `#AARRGGBB`; blank follows the theme), then the label-to-percentage gap (0–300 pixels, default **16**) and percentage-to-reset-time gap (0–64 pixels, default **8**). Changes preview immediately; **OK/Apply** saves them and **Cancel** restores the saved appearance. Existing saved spacing values are preserved.
+
+Hiding a provider's bars only changes its display. Turning off **Enable Claude usage** or **Enable Codex usage** stops that provider's polling and clears its errors. Errors from enabled providers remain visible until that provider recovers, even if its bars are hidden or another provider refreshes successfully. See the [changelog](CHANGELOG.md) for the full release notes.
 
 ## Screenshots
 
@@ -74,7 +82,7 @@ Claude Code has no official API for this, unlike Codex. The companion reads the 
 Build or download the `.deb`, then:
 
 ```bash
-sudo apt install ./claude-codex-usage-companion_0.1.2_amd64.deb
+sudo apt install ./claude-codex-usage-companion_0.1.3_amd64.deb
 ```
 
 Launch **Claude Codex Usage Companion** from KDE's application menu, or run:
@@ -89,7 +97,7 @@ The `.deb` creates the KDE/GNOME application-menu entry at `/usr/share/applicati
 
 Enabling login autostart reveals a **Minimize the window** option (hidden otherwise). When both are enabled, the app launches at login without showing its window — usage still refreshes in the background — and reopening the app (from the application menu, the tray icon if enabled, or by running it again) brings the window back.
 
-Use the **⚙ Settings** button to configure the taskbar icon, system tray, tray icon style, login autostart, language, theme, window position, low-usage alerts, reset notifications, usage logging, and always-on-top behavior. **OK** applies changes and closes the window, **Cancel** discards unapplied changes, and **Apply** saves changes without closing it.
+Use the **⚙ Settings** button to configure the taskbar icon, system tray, tray icon style, login autostart, language, theme, window position, low-usage alerts, reset notifications, usage logging, and always-on-top behavior. **OK** applies changes and closes the window, **Cancel** discards unapplied changes, and **Apply** saves changes without closing it. Under **Appearance**, set a background color using `#RRGGBB` or `#AARRGGBB` (blank uses the theme color), and adjust the gap between the percentage and reset time from 0 to 64 pixels. The horizontal gap between the 5h/Weekly label column and percentage column is adjustable from 0 to 300 pixels (default 16). The panel width adjusts to fit. Appearance changes preview immediately; **Cancel** restores the last saved appearance.
 
 ## Plasma 6 widget
 
@@ -100,7 +108,7 @@ The panel indicator shows separate progress values for Claude's current session 
 Release builds also include a standalone `.plasmoid` package. Install one without root access with:
 
 ```bash
-kpackagetool6 --type Plasma/Applet --install ./claude-codex-usage-companion-0.1.2.plasmoid
+kpackagetool6 --type Plasma/Applet --install ./claude-codex-usage-companion-0.1.3.plasmoid
 ```
 
 For a development checkout, install or update the current source package with `bash scripts/install-plasma-widget.sh`. The companion CLI must remain installed and available on `PATH`.
@@ -137,7 +145,7 @@ Set `CODEX_CLI_PATH=/absolute/path/to/codex` if Codex is not on `PATH`. Set `NO_
 
 ## Install as a Codex plugin
 
-The Linux release build creates `CodexUsageCompanionMarketplace-v0.1.2-linux-x64.zip`. Extract it, add the extracted marketplace, then install and enable the plugin:
+The Linux release build creates `CodexUsageCompanionMarketplace-v0.1.3-linux-x64.zip`. Extract it, add the extracted marketplace, then install and enable the plugin:
 
 ```bash
 codex plugin marketplace add /path/to/extracted-marketplace
@@ -168,6 +176,9 @@ ${XDG_CONFIG_HOME:-$HOME/.config}/claude-codex-usage-companion/settings.json
   "minimizeOnStart": false,
   "language": "en-US",
   "theme": "system",
+  "backgroundColor": "",
+  "percentageTimeSpacing": 8,
+  "labelPercentageSpacing": 16,
   "enableLowUsageAlert": false,
   "lowUsageAlertThresholdPercent": 20,
   "notifyOnReset": false,
@@ -241,7 +252,7 @@ dotnet run --project src/CodexUsageCompanion -- gui
 
 The GUI uses an owner-only Unix socket under `XDG_RUNTIME_DIR` to enforce one instance and accept refresh signals. Settings follow the XDG config convention; bounded logs are stored under `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-usage-companion`.
 
-Avalonia uses X11/XWayland by default on Linux. A Wayland compositor may apply its own window-positioning or always-on-top policy. The panel remains draggable and includes keyboard shortcuts, pin (always-on-top), settings, refresh, minimize, and close controls, in that order, with the two window controls set apart by a wider gap. The header's pin toggle, the Settings window's **Keep window always on top** checkbox, and the tray menu's **Keep window always on top** checkbox all reflect and update the same setting. The Claude **Current session**/**Current week (All)** section appears first, followed by the Codex section. Purchased **Credits** appear below the Codex weekly usage bar with exactly two decimal places as `Credits: 23.75, Automatic reload: Enabled/Disabled`; missing automatic-reload state is displayed as `Disabled`. Claude's weekly card shows `Usage credits: 6.32 / 100.00, Auto-reload: Enabled/Disabled` reflecting its optional pay-as-you-go extra usage credits (amount spent against the monthly cap, not a prepaid balance). Each card title shows its provider's own icon (the Claude mark or the OpenAI mark). The system tray is disabled by default: closing the panel exits the resident process. When the tray is enabled, closing hides the panel while preserving its latest usage snapshot; background interval updates and Codex rate-limit notifications continue while hidden. Clicking the tray icon, choosing **Show window**, or launching the app again restores the cached state without an immediate refetch. The tray menu contains **Show window**, **Refresh usage**, **Keep window always on top**, **Start automatically when I sign in**, **Settings**, **Keyboard shortcuts**, and **Quit**, with separators between action groups. Choose **Quit** to stop the process. The tray tooltip shows the app name, then one line per usage window — `[Claude] Current: d% remaining (Resets at ...)`, `[Claude] Weekly: d% remaining (Resets at ...)`, and `[Codex] Weekly: d% remaining (Resets at ...)` — followed by `Last updated at HH:mm` using the selected last-updated date/time format.
+Avalonia uses X11/XWayland by default on Linux. A Wayland compositor may apply its own window-positioning or always-on-top policy. The panel remains draggable and includes keyboard shortcuts, pin (always-on-top), settings, refresh, minimize, and close controls, in that order, with the two window controls set apart by a wider gap. The header's pin toggle, the Settings window's **Keep window always on top** checkbox, and the tray menu's **Keep window always on top** checkbox all reflect and update the same setting. The Claude **Current session**/**Current week (All)** section appears first, followed by the Codex section. Provider headings show the Claude or OpenAI icon. Weekly-bar tooltips show Codex credit balance and automatic reload, or Claude extra-usage spending and its monthly limit. The system tray is disabled by default: closing the panel exits the resident process. When the tray is enabled, closing hides the panel while preserving its latest usage snapshot; background interval updates and Codex rate-limit notifications continue while hidden. Clicking the tray icon, choosing **Show window**, or launching the app again restores the cached state without an immediate refetch. The tray menu contains **Show window**, **Refresh usage**, **Keep window always on top**, **Start automatically when I sign in**, **Settings**, **Keyboard shortcuts**, and **Quit**, with separators between action groups. Choose **Quit** to stop the process. The tray tooltip shows the app name, then one line per usage window — `[Claude] Current: d% remaining (Resets at ...)`, `[Claude] Weekly: d% remaining (Resets at ...)`, and `[Codex] Weekly: d% remaining (Resets at ...)` — followed by `Last updated at HH:mm` using the selected last-updated date/time format.
 
 The app reads `account/rateLimits/read` from a local `codex app-server` process. This API may evolve, so future Codex releases can require compatibility changes. Claude usage relies on an undocumented Anthropic endpoint (see [Enable Claude usage (optional)](#enable-claude-usage-optional)) that could change without notice.
 

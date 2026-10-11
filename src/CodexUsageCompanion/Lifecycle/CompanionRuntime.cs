@@ -10,8 +10,10 @@ public sealed class CompanionRuntime : IAsyncDisposable
 {
     private readonly ResidentLease _lease;
     private readonly UsageOverlayWindow _window;
-    private readonly CodexAppServerClient? _appServerClient;
-    private readonly ClaudeUsageClient? _claudeClient;
+    private CodexAppServerClient? _appServerClient;
+    private ClaudeUsageClient? _claudeClient;
+    private volatile bool _codexEnabled;
+    private volatile bool _claudeEnabled;
     private readonly CancellationTokenSource _cancellation = new();
     private readonly SemaphoreSlim _codexRefreshGate = new(1, 1);
     private readonly SemaphoreSlim _claudeRefreshGate = new(1, 1);
@@ -34,6 +36,8 @@ public sealed class CompanionRuntime : IAsyncDisposable
         _lease = lease;
         _window = window;
         _refreshInterval = TimeSpan.FromSeconds(settings.RefreshIntervalSeconds);
+        _codexEnabled = settings.EnableCodexUsage;
+        _claudeEnabled = settings.EnableClaudeUsage;
         _appServerClient = settings.EnableCodexUsage ? new CodexAppServerClient() : null;
         _claudeClient = settings.EnableClaudeUsage ? new ClaudeUsageClient() : null;
     }
@@ -75,6 +79,30 @@ public sealed class CompanionRuntime : IAsyncDisposable
         {
             _periodicTimer.Period = _refreshInterval;
         }
+    }
+
+    public void UpdateProviders(CompanionSettings settings)
+    {
+        if (Volatile.Read(ref _stopping) != 0)
+            return;
+
+        if (settings.EnableCodexUsage && _appServerClient is null)
+        {
+            _appServerClient = new CodexAppServerClient();
+            if (_started)
+                _appServerClient.RateLimitsChanged += HandleRateLimitsChanged;
+        }
+        if (settings.EnableClaudeUsage && _claudeClient is null)
+            _claudeClient = new ClaudeUsageClient();
+
+        var newlyEnabled = settings.EnableCodexUsage && !_codexEnabled ||
+            settings.EnableClaudeUsage && !_claudeEnabled;
+        if (settings.EnableClaudeUsage && !_claudeEnabled)
+            _lastClaudeFetchAt = null;
+        _codexEnabled = settings.EnableCodexUsage;
+        _claudeEnabled = settings.EnableClaudeUsage;
+        if (newlyEnabled)
+            RequestRefresh();
     }
 
     public void RefreshUsage()
@@ -244,7 +272,7 @@ public sealed class CompanionRuntime : IAsyncDisposable
 
     private async Task RefreshCodexAsync(CancellationToken cancellationToken)
     {
-        if (_appServerClient is null)
+        if (!_codexEnabled || _appServerClient is null)
         {
             return;
         }
@@ -261,8 +289,10 @@ public sealed class CompanionRuntime : IAsyncDisposable
             var updatedAt = DateTimeOffset.Now;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (!_codexEnabled)
+                    return;
                 _window.UpdateUsage(UsageProvider.Codex, state);
-                _window.SetStatus(updatedAt, null);
+                _window.SetStatus(updatedAt, null, UsageProvider.Codex);
                 UsageUpdated?.Invoke(UsageProvider.Codex, state, updatedAt);
             });
             _hasCodexUsageState = true;
@@ -277,12 +307,14 @@ public sealed class CompanionRuntime : IAsyncDisposable
             var error = Program.FriendlyError(exception);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (!_codexEnabled)
+                    return;
                 if (UsageRefreshPolicy.ShouldShowUnavailable(_hasCodexUsageState))
                 {
                     _window.UpdateUsage(UsageProvider.Codex, null);
                 }
 
-                _window.SetStatus(null, error);
+                _window.SetStatus(null, error, UsageProvider.Codex);
                 UsageUpdateFailed?.Invoke(UsageProvider.Codex, error, failedAt);
             });
         }
@@ -295,7 +327,7 @@ public sealed class CompanionRuntime : IAsyncDisposable
 
     private async Task RefreshClaudeAsync(CancellationToken cancellationToken)
     {
-        if (_claudeClient is null)
+        if (!_claudeEnabled || _claudeClient is null)
         {
             return;
         }
@@ -319,8 +351,10 @@ public sealed class CompanionRuntime : IAsyncDisposable
             var updatedAt = DateTimeOffset.Now;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (!_claudeEnabled)
+                    return;
                 _window.UpdateUsage(UsageProvider.Claude, state);
-                _window.SetStatus(updatedAt, null);
+                _window.SetStatus(updatedAt, null, UsageProvider.Claude);
                 UsageUpdated?.Invoke(UsageProvider.Claude, state, updatedAt);
             });
             _hasClaudeUsageState = true;
@@ -335,12 +369,14 @@ public sealed class CompanionRuntime : IAsyncDisposable
             var error = Program.FriendlyError(exception);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (!_claudeEnabled)
+                    return;
                 if (UsageRefreshPolicy.ShouldShowUnavailable(_hasClaudeUsageState))
                 {
                     _window.UpdateUsage(UsageProvider.Claude, null);
                 }
 
-                _window.SetStatus(null, error);
+                _window.SetStatus(null, error, UsageProvider.Claude);
                 UsageUpdateFailed?.Invoke(UsageProvider.Claude, error, failedAt);
             });
         }

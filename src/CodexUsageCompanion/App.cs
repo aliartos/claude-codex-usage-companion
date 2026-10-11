@@ -400,6 +400,7 @@ public sealed class App : Application
 
         var dialog = new SettingsWindow(_settings, _text);
         dialog.PositionPreviewRequested += _window.ApplyPosition;
+        dialog.AppearancePreviewRequested += _window.ApplyAppearance;
         dialog.ApplyRequested += TryApplySettings;
         _settingsWindow = dialog;
         try
@@ -408,6 +409,7 @@ public sealed class App : Application
             if (updated is null)
             {
                 _window.ApplyPosition(_settings.Position);
+                _window.ApplyAppearance(_settings.BackgroundColor, _settings.PercentageTimeSpacing, _settings.LabelPercentageSpacing);
                 return;
             }
 
@@ -421,11 +423,13 @@ public sealed class App : Application
         {
             CompanionLog.Shared.Write("settings", exception);
             _window.ApplyPosition(_settings.Position);
+            _window.ApplyAppearance(_settings.BackgroundColor, _settings.PercentageTimeSpacing, _settings.LabelPercentageSpacing);
             _window.SetStatus(null, $"Unable to save settings: {exception.Message}");
         }
         finally
         {
             dialog.PositionPreviewRequested -= _window.ApplyPosition;
+            dialog.AppearancePreviewRequested -= _window.ApplyAppearance;
             dialog.ApplyRequested -= TryApplySettings;
             _settingsWindow = null;
         }
@@ -465,6 +469,7 @@ public sealed class App : Application
         _window!.ApplySettings(_settings, _text);
         // The shortcuts window renders localized text captured when it opened.
         _shortcutsWindow?.Close();
+        _runtime?.UpdateProviders(_settings);
         _runtime?.UpdateRefreshInterval(_settings.RefreshIntervalSeconds);
         UpdateTrayIcon();
     }

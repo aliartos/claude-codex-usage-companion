@@ -166,6 +166,9 @@ public static class CompanionSettingsStore
             LegacyShowFiveHourLimit = null,
             Language = language,
             Theme = UiThemeOptions.Normalize(settings.Theme),
+            BackgroundColor = OverlayAppearanceOptions.NormalizeBackgroundColor(settings.BackgroundColor),
+            PercentageTimeSpacing = OverlayAppearanceOptions.NormalizeSpacing(settings.PercentageTimeSpacing),
+            LabelPercentageSpacing = OverlayAppearanceOptions.NormalizeLabelPercentageSpacing(settings.LabelPercentageSpacing),
             TrayIconStyle = TrayIconStyleOptions.Normalize(settings.TrayIconStyle),
             LowUsageAlertThresholdPercent = UsageAlertOptions.NormalizeThreshold(
                 settings.LowUsageAlertThresholdPercent),

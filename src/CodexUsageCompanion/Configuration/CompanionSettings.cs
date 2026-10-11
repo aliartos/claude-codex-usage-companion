@@ -22,6 +22,9 @@ public sealed record CompanionSettings
         SystemLanguageOptions.ResolveDefault(
             System.Globalization.CultureInfo.CurrentUICulture);
     public string Theme { get; init; } = UiThemeOptions.System;
+    public string BackgroundColor { get; init; } = string.Empty;
+    public int PercentageTimeSpacing { get; init; } = OverlayAppearanceOptions.DefaultSpacing;
+    public int LabelPercentageSpacing { get; init; } = OverlayAppearanceOptions.DefaultLabelPercentageSpacing;
     public bool EnableLowUsageAlert { get; init; }
     public int LowUsageAlertThresholdPercent { get; init; } =
         UsageAlertOptions.DefaultThresholdPercent;
