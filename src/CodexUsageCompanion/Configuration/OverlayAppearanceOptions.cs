@@ -2,8 +2,8 @@ namespace CodexUsageCompanion.Configuration;
 
 public static class OverlayAppearanceOptions
 {
-    public const int DefaultSpacing = 8;
-    public const int DefaultLabelPercentageSpacing = 16;
+    public const int DefaultSpacing = 16;
+    public const int DefaultLabelPercentageSpacing = 128;
     public const int MaximumSpacing = 64;
 
     public static bool IsValidBackgroundColor(string? value)

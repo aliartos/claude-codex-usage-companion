@@ -151,6 +151,19 @@ public static class CompanionSettingsStore
 
     internal static CompanionSettings Normalize(CompanionSettings settings)
     {
+        // Migrate the previous untouched defaults to the compact bar layout.
+        // Individually resized layouts remain unchanged.
+        if (settings.ClaudeSessionCardHeight == 78 && settings.ClaudeWeeklyCardHeight == 96 &&
+            settings.CodexFiveHourCardHeight == 78 && settings.CodexWeeklyCardHeight == 96)
+        {
+            settings = settings with
+            {
+                ClaudeSessionCardHeight = OverlayLayoutOptions.FiveHourCardHeight,
+                ClaudeWeeklyCardHeight = OverlayLayoutOptions.WeeklyCardHeight,
+                CodexFiveHourCardHeight = OverlayLayoutOptions.FiveHourCardHeight,
+                CodexWeeklyCardHeight = OverlayLayoutOptions.WeeklyCardHeight
+            };
+        }
         var language = settings.Language?.ToLowerInvariant() switch
         {
             "en" or "en-us" => "en-US",
@@ -166,6 +179,7 @@ public static class CompanionSettingsStore
             LegacyShowFiveHourLimit = null,
             Language = language,
             Theme = UiThemeOptions.Normalize(settings.Theme),
+            SettingsSections = settings.SettingsSections ?? new SettingsSectionState(),
             FontScale = OverlayLayoutOptions.NormalizeFontScale(settings.FontScale),
             ClaudeSessionCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeSessionCardHeight, weekly: false),
             ClaudeWeeklyCardHeight = OverlayLayoutOptions.NormalizeCardHeight(settings.ClaudeWeeklyCardHeight, weekly: true),

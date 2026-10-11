@@ -31,8 +31,8 @@ public sealed class CompanionSettingsTests
                 settings.Language);
             Assert.Equal(UiThemeOptions.System, settings.Theme);
             Assert.Equal(1d, settings.FontScale);
-            Assert.Equal(78d, settings.ClaudeSessionCardHeight);
-            Assert.Equal(96d, settings.ClaudeWeeklyCardHeight);
+            Assert.Equal(36d, settings.ClaudeSessionCardHeight);
+            Assert.Equal(OverlayLayoutOptions.WeeklyCardHeight, settings.ClaudeWeeklyCardHeight);
             Assert.False(settings.EnableLowUsageAlert);
             Assert.Equal(
                 UsageAlertOptions.DefaultThresholdPercent,

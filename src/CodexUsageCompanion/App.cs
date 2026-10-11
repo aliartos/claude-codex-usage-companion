@@ -430,10 +430,28 @@ public sealed class App : Application
         }
         finally
         {
+            SaveSettingsSectionState(dialog.SectionState);
             dialog.PositionPreviewRequested -= _window.ApplyPosition;
             dialog.AppearancePreviewRequested -= _window.ApplyAppearance;
             dialog.ApplyRequested -= TryApplySettings;
             _settingsWindow = null;
+        }
+    }
+
+    private void SaveSettingsSectionState(SettingsSectionState sections)
+    {
+        if (_settings.SettingsSections == sections)
+            return;
+        try
+        {
+            // Save only view state, including after Cancel; unapplied form edits
+            // remain discarded. Use the latest settings in case Apply was used.
+            _settings = CompanionSettingsStore.Save(_settings with { SettingsSections = sections });
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            CompanionLog.Shared.Write("settings-sections", exception);
+            _window?.SetStatus(null, $"Unable to save settings section state: {exception.Message}");
         }
     }
 

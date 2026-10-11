@@ -19,15 +19,37 @@ This Linux port is based on [gkfriend/codex-usage-companion](https://github.com/
 
 The panel now uses [QuotaGem](https://github.com/gyozalab/QuotaGem)-inspired provider headings and rounded bars, with the 5h/Weekly label, remaining percentage, and local reset time on one row. The columns stay aligned, and the panel fits its content and remains at the configured screen position when providers are hidden. Hover over a weekly bar to see credit details.
 
-Settings sections are collapsible and ordered A–Z. Under **Appearance**, configure the background color (`#RRGGBB` or `#AARRGGBB`; blank follows the theme), then the label-to-percentage gap (0–300 pixels, default **16**) and percentage-to-reset-time gap (0–64 pixels, default **8**). Changes preview immediately; **OK/Apply** saves them and **Cancel** restores the saved appearance. Existing saved spacing values are preserved.
+Settings sections are collapsible and ordered A–Z. **Expand all** and **Collapse all** control every section. Each section’s state is saved when Settings closes, even after **Cancel**, and restored on reopening or after an app restart; unapplied form edits are still discarded. Under **Appearance**, configure the background color (`#RRGGBB` or `#AARRGGBB`; blank follows the theme), then the label-to-percentage gap (0–300 pixels, default **128**) and percentage-to-reset-time gap (0–64 pixels, default **16**). Changes preview immediately; **OK/Apply** saves them and **Cancel** restores the saved appearance. Existing saved spacing values are preserved.
 
 Hiding a provider's bars only changes its display. Turning off **Enable Claude usage** or **Enable Codex usage** stops that provider's polling and clears its errors. Errors from enabled providers remain visible until that provider recovers, even if its bars are hidden or another provider refreshes successfully. See the [changelog](CHANGELOG.md) for the full release notes.
+
+Usage cards use 36-pixel progress bars, with extra space below weekly bars for credits and automatic reload information, and grow with larger fonts. Resize marks appear on hover or keyboard focus. Previous untouched 78/96-pixel defaults migrate to compact heights; custom resized layouts are preserved.
+
+The **Expand all** icon has four outward arrows; **Collapse all** has four inward arrows. Hover for a tooltip. Saved gaps apply from the first display, including while usage is loading. The percentage column fits its text and spacing; changing either gap refits the panel width. When you manually widen the panel, extra space goes before the percentage column and the reset-time column remains near the right edge. Preset positions use the desktop working area to avoid reserved taskbars and panels.
+
+**Reset to defaults** opens a **Yes/No** confirmation before restoring all preferences in the settings form, including card heights and spacing. **No**, Escape, or closing the confirmation leaves the form unchanged. Choose **OK/Apply** to save, or **Cancel** to discard the reset. Section expansion states are preserved. Resizing a card also changes its progress track and fill height.
+
+The initial window fits all visible cards and the status line before opening, with only the normal bottom inset. After the first usage result arrives, the panel refits the waiting-text columns while retaining the configured 128/16-pixel default gaps.
 
 ## Screenshots
 
 | English (`en-US`) | Traditional Chinese (`zh-tw`) | Simplified Chinese (`zh-cn`) |
 | --- | --- | --- |
 | ![English usage overlay](assets/screenshots/overlay-en.png) | ![Traditional Chinese usage overlay](assets/screenshots/overlay-zh-tw.png) | ![Simplified Chinese usage overlay](assets/screenshots/overlay-zh-cn.png) |
+
+The overlay images use sample usage data. Settings sections can be expanded by clicking their titles.
+
+### Settings
+
+| English (`en-US`) | Traditional Chinese (`zh-tw`) | Simplified Chinese (`zh-cn`) |
+| --- | --- | --- |
+| ![English settings](assets/screenshots/settings-en.png) | ![Traditional Chinese settings](assets/screenshots/settings-zh-tw.png) | ![Simplified Chinese settings](assets/screenshots/settings-zh-cn.png) |
+
+### Reset confirmation
+
+| English (`en-US`) | Traditional Chinese (`zh-tw`) | Simplified Chinese (`zh-cn`) |
+| --- | --- | --- |
+| ![English reset confirmation](assets/screenshots/reset-confirmation-en.png) | ![Traditional Chinese reset confirmation](assets/screenshots/reset-confirmation-zh-tw.png) | ![Simplified Chinese reset confirmation](assets/screenshots/reset-confirmation-zh-cn.png) |
 
 ### Plasma 6 widget
 
@@ -97,7 +119,7 @@ The `.deb` creates the KDE/GNOME application-menu entry at `/usr/share/applicati
 
 Enabling login autostart reveals a **Minimize the window** option (hidden otherwise). When both are enabled, the app launches at login without showing its window — usage still refreshes in the background — and reopening the app (from the application menu, the tray icon if enabled, or by running it again) brings the window back.
 
-Use the **⚙ Settings** button to configure the taskbar icon, system tray, tray icon style, login autostart, language, theme, window position, low-usage alerts, reset notifications, usage logging, and always-on-top behavior. **OK** applies changes and closes the window, **Cancel** discards unapplied changes, and **Apply** saves changes without closing it. Under **Appearance**, set a background color using `#RRGGBB` or `#AARRGGBB` (blank uses the theme color), and adjust the gap between the percentage and reset time from 0 to 64 pixels. The horizontal gap between the 5h/Weekly label column and percentage column is adjustable from 0 to 300 pixels (default 16). The panel width adjusts to fit. Appearance changes preview immediately; **Cancel** restores the last saved appearance.
+Use the **⚙ Settings** button to configure the taskbar icon, system tray, tray icon style, login autostart, language, theme, window position, low-usage alerts, reset notifications, usage logging, and always-on-top behavior. **OK** applies changes and closes the window, **Cancel** discards unapplied changes, and **Apply** saves changes without closing it. Under **Appearance**, set a background color using `#RRGGBB` or `#AARRGGBB` (blank uses the theme color), and adjust the gap between the percentage and reset time from 0 to 64 pixels. The horizontal gap between the 5h/Weekly label column and percentage column is adjustable from 0 to 300 pixels (default 128). The panel width adjusts to fit. Appearance changes preview immediately; **Cancel** restores the last saved appearance.
 
 ## Plasma 6 widget
 
@@ -176,9 +198,17 @@ ${XDG_CONFIG_HOME:-$HOME/.config}/claude-codex-usage-companion/settings.json
   "minimizeOnStart": false,
   "language": "en-US",
   "theme": "system",
+  "settingsSections": {
+    "appearance": true,
+    "dateTime": true,
+    "logging": true,
+    "notifications": true,
+    "usage": true,
+    "window": true
+  },
   "backgroundColor": "",
-  "percentageTimeSpacing": 8,
-  "labelPercentageSpacing": 16,
+  "percentageTimeSpacing": 16,
+  "labelPercentageSpacing": 128,
   "enableLowUsageAlert": false,
   "lowUsageAlertThresholdPercent": 20,
   "notifyOnReset": false,
@@ -240,6 +270,14 @@ For ARM64:
 bash scripts/build-linux.sh linux-arm64
 ```
 
+To rebuild, reinstall, and restart the installed app:
+
+```bash
+./scripts/rebuild-reinstall.sh
+```
+
+This stops your running companion, builds for the host architecture, runs `sudo apt reinstall -f` on the generated `.deb`, and launches the installed command. Run the script as your normal desktop user; sudo is requested only for package installation. The script stops on failure.
+
 The build runs the test suite and writes a `.deb`, portable `.tar.gz`, Plasma `.plasmoid`, Codex marketplace `.zip`, and checksums under `artifacts/`.
 
 For a development run:
@@ -253,10 +291,9 @@ dotnet run --project src/CodexUsageCompanion -- gui
 
 The GUI uses an owner-only Unix socket under `XDG_RUNTIME_DIR` to enforce one instance and accept refresh signals. Settings follow the XDG config convention; bounded logs are stored under `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-usage-companion`.
 
-On a Wayland desktop with XWayland available, the app uses Avalonia's X11 compatibility backend so the selected window position controls startup placement and later position changes. With native Wayland only, the compositor controls placement and may ignore this setting. X11 sessions use the X11 backend. Drag the header to move the panel, or drag its lower-right corner to resize it; cards and usage bars adapt to the width, and shorter windows scroll. The panel remains draggable and includes keyboard shortcuts, pin (always-on-top), settings, refresh, minimize, and close controls, in that order, with the two window controls set apart by a wider gap. The header's pin toggle, the Settings window's **Keep window always on top** checkbox, and the tray menu's **Keep window always on top** checkbox all reflect and update the same setting. The Claude **Current session**/**Current week (All)** section appears first, followed by the Codex section. Provider headings show the Claude or OpenAI icon. Weekly-bar tooltips show Codex credit balance and automatic reload, or Claude extra-usage spending and its monthly limit. The system tray is disabled by default: closing the panel exits the resident process. When the tray is enabled, closing hides the panel while preserving its latest usage snapshot; background interval updates and Codex rate-limit notifications continue while hidden. Clicking the tray icon, choosing **Show window**, or launching the app again restores the cached state and its last on-screen position without an immediate refetch. The tray menu contains **Show window**, **Refresh usage**, **Keep window always on top**, **Start automatically when I sign in**, **Settings**, **Keyboard shortcuts**, and **Quit**, with separators between action groups. Choose **Quit** to stop the process. The tray tooltip shows the app name, then one line per usage window — `[Claude] Current: d% remaining (Resets at ...)`, `[Claude] Weekly: d% remaining (Resets at ...)`, and `[Codex] Weekly: d% remaining (Resets at ...)` — followed by `Last updated at HH:mm` using the selected last-updated date/time format.
+On a Wayland desktop with XWayland available, the app uses Avalonia's X11 compatibility backend so the selected window position controls startup placement and later position changes. With native Wayland only, the compositor controls placement and may ignore this setting. X11 sessions use the X11 backend. Drag the header to move the panel, or drag its lower-right corner to resize it; cards and usage bars adapt to the width, and shorter windows scroll. The panel remains draggable and includes keyboard shortcuts, pin (always-on-top), settings, refresh, minimize, and close controls, in that order, with the two window controls set apart by a wider gap. The header's pin toggle, the Settings window's **Keep window always on top** checkbox, and the tray menu's **Keep window always on top** checkbox all reflect and update the same setting. The Claude **Current session**/**Current week (All)** section appears first, followed by the Codex section. Provider headings show the Claude or OpenAI icon. Below the weekly bars, the panel shows Codex credit balance and automatic reload, or Claude extra-usage spending and its monthly limit. These details also appear in tooltips. The system tray is disabled by default: closing the panel exits the resident process. When the tray is enabled, closing hides the panel while preserving its latest usage snapshot; background interval updates and Codex rate-limit notifications continue while hidden. Clicking the tray icon, choosing **Show window**, or launching the app again restores the cached state and its last on-screen position without an immediate refetch. The tray menu contains **Show window**, **Refresh usage**, **Keep window always on top**, **Start automatically when I sign in**, **Settings**, **Keyboard shortcuts**, and **Quit**, with separators between action groups. Choose **Quit** to stop the process. The tray tooltip shows the app name, then one line per usage window — `[Claude] Current: d% remaining (Resets at ...)`, `[Claude] Weekly: d% remaining (Resets at ...)`, and `[Codex] Weekly: d% remaining (Resets at ...)` — followed by `Last updated at HH:mm` using the selected last-updated date/time format.
 
 Drag the small handle at the bottom of a usage card to change that card's height; the height is saved automatically. The handle also accepts Up/Down keys when focused. In **Settings → Appearance**, drag **Panel font size** (80–150%) to preview text, then choose **Apply** or **OK** to save it. The lower-right window resize mark appears on hover.
-
 
 The app reads `account/rateLimits/read` from a local `codex app-server` process. This API may evolve, so future Codex releases can require compatibility changes. Claude usage relies on an undocumented Anthropic endpoint (see [Enable Claude usage (optional)](#enable-claude-usage-optional)) that could change without notice.
 

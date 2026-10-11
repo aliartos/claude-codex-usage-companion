@@ -14,7 +14,7 @@ namespace CodexUsageCompanion.Ui;
 
 public sealed class SettingsWindow : Window
 {
-    private readonly CompanionSettings _settings;
+    private CompanionSettings _settings;
     private readonly UiText _text;
     private readonly CheckBox _systemTray;
     private readonly ComboBox _trayIconStyle;
@@ -54,6 +54,9 @@ public sealed class SettingsWindow : Window
     private CompanionSettings _initialSettings = null!;
     private bool _allowClose;
     private bool _discardPromptOpen;
+    private bool _resettingDefaults;
+    private bool _resetPromptOpen;
+    private readonly Dictionary<string, Expander> _sections = [];
 
     public SettingsWindow(CompanionSettings settings, UiText text)
     {
@@ -270,7 +273,7 @@ public sealed class SettingsWindow : Window
         };
         _position.SelectionChanged += (_, _) =>
         {
-            if (_position.SelectedItem is string position)
+            if (!_resettingDefaults && _position.SelectedItem is string position)
             {
                 PositionPreviewRequested?.Invoke(position);
             }
@@ -488,7 +491,7 @@ public sealed class SettingsWindow : Window
             Spacing = 12,
             Children =
             {
-                CreateSection(text.AppearanceSettingsGroup,
+                CreateSection("appearance", text.AppearanceSettingsGroup,
                 languageLabel,
                 _language,
                 themeLabel,
@@ -504,7 +507,7 @@ public sealed class SettingsWindow : Window
                 positionLabel,
                 _position
                 ),
-                CreateSection(text.DateTimeSettingsGroup,
+                CreateSection("dateTime", text.DateTimeSettingsGroup,
                 resetDateTimeFormatLabel,
                 _resetDateTimeFormat,
                 _resetDateTimeFormatStatus,
@@ -512,19 +515,19 @@ public sealed class SettingsWindow : Window
                 _lastUpdatedDateTimeFormat,
                 _lastUpdatedDateTimeFormatStatus
                 ),
-                CreateSection(text.LoggingSettingsGroup,
+                CreateSection("logging", text.LoggingSettingsGroup,
                 _usageLogging,
                 usageLogFilePathLabel,
                 _usageLogFilePath,
                 usageLogFormatLabel,
                 _usageLogFormat),
-                CreateSection(text.NotificationSettingsGroup,
+                CreateSection("notifications", text.NotificationSettingsGroup,
                 _lowUsageAlert,
                 lowUsageAlertThresholdLabel,
                 _lowUsageAlertThreshold,
                 _notifyOnReset
                 ),
-                CreateSection(text.UsageSettingsGroup,
+                CreateSection("usage", text.UsageSettingsGroup,
                 _enableClaudeUsage,
                 _enableCodexUsage,
                 displayedLimitsLabel,
@@ -535,7 +538,7 @@ public sealed class SettingsWindow : Window
                 updateIntervalLabel,
                 _updateInterval
                 ),
-                CreateSection(text.WindowSettingsGroup,
+                CreateSection("window", text.WindowSettingsGroup,
                 _systemTray,
                 trayIconStyleLabel,
                 _trayIconStyle,
@@ -546,6 +549,29 @@ public sealed class SettingsWindow : Window
                 )
             }
         };
+        var expandAll = CreateSectionActionButton(text.ExpandAllAction,
+            "M3,2 L8,2 Q9,2 9,3 Q9,4 8,4 L5.4,4 L10.7,9.3 Q11.4,10 10.7,10.7 Q10,11.4 9.3,10.7 L4,5.4 L4,8 Q4,9 3,9 Q2,9 2,8 L2,3 Q2,2 3,2 Z M22,3 L22,8 Q22,9 21,9 Q20,9 20,8 L20,5.4 L14.7,10.7 Q14,11.4 13.3,10.7 Q12.6,10 13.3,9.3 L18.6,4 L16,4 Q15,4 15,3 Q15,2 16,2 L21,2 Q22,2 22,3 Z M21,22 L16,22 Q15,22 15,21 Q15,20 16,20 L18.6,20 L13.3,14.7 Q12.6,14 13.3,13.3 Q14,12.6 14.7,13.3 L20,18.6 L20,16 Q20,15 21,15 Q22,15 22,16 L22,21 Q22,22 21,22 Z M2,21 L2,16 Q2,15 3,15 Q4,15 4,16 L4,18.6 L9.3,13.3 Q10,12.6 10.7,13.3 Q11.4,14 10.7,14.7 L5.4,20 L8,20 Q9,20 9,21 Q9,22 8,22 L3,22 Q2,22 2,21 Z");
+        var collapseAll = CreateSectionActionButton(text.CollapseAllAction,
+            "M9,10 L4,10 Q3,10 3,9 Q3,8 4,8 L6.6,8 L1.3,2.7 Q0.6,2 1.3,1.3 Q2,0.6 2.7,1.3 L8,6.6 L8,4 Q8,3 9,3 Q10,3 10,4 L10,9 Q10,10 9,10 Z M14,9 L14,4 Q14,3 15,3 Q16,3 16,4 L16,6.6 L21.3,1.3 Q22,0.6 22.7,1.3 Q23.4,2 22.7,2.7 L17.4,8 L20,8 Q21,8 21,9 Q21,10 20,10 L15,10 Q14,10 14,9 Z M15,14 L20,14 Q21,14 21,15 Q21,16 20,16 L17.4,16 L22.7,21.3 Q23.4,22 22.7,22.7 Q22,23.4 21.3,22.7 L16,17.4 L16,20 Q16,21 15,21 Q14,21 14,20 L14,15 Q14,14 15,14 Z M10,15 L10,20 Q10,21 9,21 Q8,21 8,20 L8,17.4 L2.7,22.7 Q2,23.4 1.3,22.7 Q0.6,22 1.3,21.3 L6.6,16 L4,16 Q3,16 3,15 Q3,14 4,14 L9,14 Q10,14 10,15 Z");
+        expandAll.Click += (_, _) => SetAllSectionsExpanded(true);
+        collapseAll.Click += (_, _) => SetAllSectionsExpanded(false);
+        var resetDefaults = new Button { Content = text.ResetDefaultsAction };
+        resetDefaults.Click += async (_, _) => await ConfirmResetDefaultsAsync();
+        var bulkActions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8,
+            Children = { expandAll, collapseAll }
+        };
+        var sectionActions = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            Margin = new Thickness(0, 0, 0, 12),
+            Children = { resetDefaults, bulkActions }
+        };
+        resetDefaults.HorizontalAlignment = HorizontalAlignment.Left;
+        Grid.SetColumn(bulkActions, 1);
         var optionsScroller = new ScrollViewer
         {
             Content = options,
@@ -554,11 +580,13 @@ public sealed class SettingsWindow : Window
         };
         var layout = new Grid
         {
-            RowDefinitions = new RowDefinitions("*,Auto,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
             Margin = new Thickness(24)
         };
-        Grid.SetRow(attributionInfo, 1);
-        Grid.SetRow(actions, 2);
+        Grid.SetRow(optionsScroller, 1);
+        Grid.SetRow(attributionInfo, 2);
+        Grid.SetRow(actions, 3);
+        layout.Children.Add(sectionActions);
         layout.Children.Add(optionsScroller);
         layout.Children.Add(attributionInfo);
         layout.Children.Add(actions);
@@ -580,10 +608,128 @@ public sealed class SettingsWindow : Window
         Closing += HandleClosing;
     }
 
+    public SettingsSectionState SectionState => new()
+    {
+        Appearance = _sections["appearance"].IsExpanded,
+        DateTime = _sections["dateTime"].IsExpanded,
+        Logging = _sections["logging"].IsExpanded,
+        Notifications = _sections["notifications"].IsExpanded,
+        Usage = _sections["usage"].IsExpanded,
+        Window = _sections["window"].IsExpanded
+    };
+
+    private void SetAllSectionsExpanded(bool expanded)
+    {
+        foreach (var section in _sections.Values)
+            section.IsExpanded = expanded;
+    }
+
     public event Action<string>? PositionPreviewRequested;
     public event Action<string, int, int>? AppearancePreviewRequested;
 
     public event Func<CompanionSettings, bool>? ApplyRequested;
+
+    private async Task ConfirmResetDefaultsAsync()
+    {
+        if (_resetPromptOpen)
+            return;
+        _resetPromptOpen = true;
+        try
+        {
+            var dialog = new Window
+            {
+                Title = _text.ConfirmResetDefaultsTitle,
+                Width = 420,
+                Height = 190,
+                CanResize = false,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            var yes = new Button { Content = _text.YesAction, MinWidth = 88 };
+            var no = new Button { Content = _text.NoAction, MinWidth = 88, IsDefault = true };
+            yes.Click += (_, _) => dialog.Close(true);
+            no.Click += (_, _) => dialog.Close(false);
+            var actions = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Spacing = 8,
+                Children = { yes, no }
+            };
+            var layout = new Grid { RowDefinitions = new RowDefinitions("*,Auto"), Margin = new Thickness(24) };
+            Grid.SetRow(actions, 1);
+            layout.Children.Add(new TextBlock { Text = _text.ConfirmResetDefaultsMessage, TextWrapping = TextWrapping.Wrap });
+            layout.Children.Add(actions);
+            dialog.Content = layout;
+            dialog.Opened += (_, _) => no.Focus();
+            dialog.KeyDown += (_, args) =>
+            {
+                if (args.Key == Key.Escape)
+                {
+                    args.Handled = true;
+                    dialog.Close(false);
+                }
+            };
+            if (await dialog.ShowDialog<bool>(this))
+                ResetToDefaults();
+        }
+        finally
+        {
+            _resetPromptOpen = false;
+        }
+    }
+
+    private void ResetToDefaults()
+    {
+        var defaults = new CompanionSettings { SettingsSections = SectionState };
+        _resettingDefaults = true;
+        try
+        {
+            // Keep reset edits in the form until OK/Apply; Cancel still discards them.
+            _settings = defaults;
+            _systemTray.IsChecked = defaults.EnableSystemTray;
+            _trayIconStyle.SelectedItem = _trayIconStyle.Items.OfType<TrayIconStyleChoice>().First(choice => choice.Value == defaults.TrayIconStyle);
+            _showTaskbarIcon.IsChecked = defaults.ShowTaskbarIcon;
+            _startOnBoot.IsChecked = defaults.StartOnBoot;
+            _minimizeOnStart.IsChecked = defaults.MinimizeOnStart;
+            _alwaysOnTop.IsChecked = defaults.AlwaysOnTop;
+            _enableClaudeUsage.IsChecked = defaults.EnableClaudeUsage;
+            _enableCodexUsage.IsChecked = defaults.EnableCodexUsage;
+            _showClaudeSession.IsChecked = defaults.ShowClaudeSession;
+            _showClaudeWeekly.IsChecked = defaults.ShowClaudeWeekly;
+            _showCodexFiveHour.IsChecked = defaults.ShowCodexFiveHour;
+            _showCodexWeekly.IsChecked = defaults.ShowCodexWeekly;
+            _language.SelectedItem = _language.Items.OfType<LanguageChoice>().First(choice => choice.Value == defaults.Language);
+            _theme.SelectedItem = _theme.Items.OfType<ThemeChoice>().First(choice => choice.Value == defaults.Theme);
+            _fontSizeSlider.Value = defaults.FontScale * 100;
+            _backgroundColor.Text = defaults.BackgroundColor;
+            _labelPercentageSpacing.Value = defaults.LabelPercentageSpacing;
+            _percentageTimeSpacing.Value = defaults.PercentageTimeSpacing;
+            _position.SelectedItem = defaults.Position;
+            _updateInterval.SelectedItem = _updateInterval.Items.OfType<UpdateIntervalChoice>().First(choice => choice.Seconds == defaults.RefreshIntervalSeconds);
+            _lowUsageAlert.IsChecked = defaults.EnableLowUsageAlert;
+            _lowUsageAlertThreshold.Value = defaults.LowUsageAlertThresholdPercent;
+            _notifyOnReset.IsChecked = defaults.NotifyOnReset;
+            _resetDateTimeFormat.SelectedItem = defaults.ResetDateTimeFormat;
+            _resetDateTimeFormat.Text = defaults.ResetDateTimeFormat;
+            _lastUpdatedDateTimeFormat.SelectedItem = defaults.LastUpdatedDateTimeFormat;
+            _lastUpdatedDateTimeFormat.Text = defaults.LastUpdatedDateTimeFormat;
+            _usageLogging.IsChecked = defaults.EnableUsageLogging;
+            _usageLogFormat.SelectedItem = defaults.UsageLogFormat;
+            _usageLogFilePath.Text = defaults.UsageLogFilePath;
+        }
+        finally
+        {
+            _resettingDefaults = false;
+        }
+        UpdateMinimizeOnStartControls();
+        UpdateDisplayedLimitControls();
+        UpdateLowUsageAlertControls();
+        UpdateUsageLoggingControls();
+        UpdateFontSizePreview();
+        PreviewAppearance();
+        PositionPreviewRequested?.Invoke(defaults.Position);
+    }
 
     private void UpdateFontSizePreview()
     {
@@ -827,6 +973,8 @@ public sealed class SettingsWindow : Window
 
     private void PreviewAppearance()
     {
+        if (_resettingDefaults)
+            return;
         UpdateDateTimeFormatValidation();
         if (OverlayAppearanceOptions.IsValidBackgroundColor(_backgroundColor.Text))
             AppearancePreviewRequested?.Invoke(_backgroundColor.Text ?? string.Empty,
@@ -882,7 +1030,23 @@ public sealed class SettingsWindow : Window
         return (comboBox.Text ?? comboBox.SelectedItem as string ?? string.Empty).Trim();
     }
 
-    private static Expander CreateSection(string title, params Control[] controls)
+    private static Button CreateSectionActionButton(string label, string geometry)
+    {
+        var button = new Button
+        {
+            Content = new PathIcon { Width = 18, Height = 18, Data = Geometry.Parse(geometry) },
+            Width = 32,
+            Height = 32,
+            Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+        ToolTip.SetTip(button, label);
+        AutomationProperties.SetName(button, label);
+        return button;
+    }
+
+    private Expander CreateSection(string key, string title, params Control[] controls)
     {
         var content = new StackPanel
         {
@@ -892,7 +1056,7 @@ public sealed class SettingsWindow : Window
         foreach (var control in controls)
             content.Children.Add(control);
 
-        return new Expander
+        var section = new Expander
         {
             Header = new TextBlock
             {
@@ -900,11 +1064,13 @@ public sealed class SettingsWindow : Window
                 FontWeight = FontWeight.Bold,
                 FontSize = 15
             },
-            IsExpanded = true,
+            IsExpanded = _settings.SettingsSections.IsExpanded(key),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Content = content
         };
+        _sections.Add(key, section);
+        return section;
     }
 
     private sealed record LanguageChoice(string Value, string DisplayName)

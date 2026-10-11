@@ -493,6 +493,55 @@ public sealed record UiText(
         _ => "Keep editing"
     };
 
+    public string ConfirmResetDefaultsTitle => Language switch
+    {
+        UiLanguage.TraditionalChinese => "還原預設值？",
+        UiLanguage.SimplifiedChinese => "恢复默认值？",
+        _ => "Reset to defaults?"
+    };
+
+    public string ConfirmResetDefaultsMessage => Language switch
+    {
+        UiLanguage.TraditionalChinese => "要將所有設定還原為預設值嗎？還原後請按確定或套用儲存。",
+        UiLanguage.SimplifiedChinese => "要将所有设置恢复为默认值吗？恢复后请点击确定或应用保存。",
+        _ => "Reset all settings to their default values? Choose OK or Apply afterward to save them."
+    };
+
+    public string YesAction => Language switch
+    {
+        UiLanguage.TraditionalChinese => "是",
+        UiLanguage.SimplifiedChinese => "是",
+        _ => "Yes"
+    };
+
+    public string NoAction => Language switch
+    {
+        UiLanguage.TraditionalChinese => "否",
+        UiLanguage.SimplifiedChinese => "否",
+        _ => "No"
+    };
+
+    public string ResetDefaultsAction => Language switch
+    {
+        UiLanguage.TraditionalChinese => "還原預設值",
+        UiLanguage.SimplifiedChinese => "恢复默认值",
+        _ => "Reset to defaults"
+    };
+
+    public string ExpandAllAction => Language switch
+    {
+        UiLanguage.TraditionalChinese => "全部展開",
+        UiLanguage.SimplifiedChinese => "全部展开",
+        _ => "Expand all"
+    };
+
+    public string CollapseAllAction => Language switch
+    {
+        UiLanguage.TraditionalChinese => "全部收合",
+        UiLanguage.SimplifiedChinese => "全部折叠",
+        _ => "Collapse all"
+    };
+
     public string BackgroundColorOption => Language switch
     {
         UiLanguage.TraditionalChinese => "背景顏色（#RRGGBB 或 #AARRGGBB）",

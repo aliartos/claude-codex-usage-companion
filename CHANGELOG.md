@@ -8,18 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- A localized Reset to defaults button opens a Yes/No confirmation before restoring the settings form, including layout defaults; changes are saved only with OK/Apply.
 - Window movement and resizing on Wayland desktops, per-card vertical resizing, and a font-size slider with preview.
 - A `custom` window position that saves coordinates after dragging the app window and restores them at launch.
-
 - Custom panel background colors with optional alpha transparency, live preview, validation, and a theme-color fallback.
-- Configurable horizontal spacing between the 5h/Weekly labels and percentages (default 16 pixels), and between percentages and reset times (default 8 pixels).
+- Configurable horizontal spacing between the 5h/Weekly labels and percentages (default 128 pixels), and between percentages and reset times (default 16 pixels).
 - Collapsible settings sections ordered A–Z: Appearance, Date and time, Logging, Notifications, Usage, and Window and startup.
+- Expand all and Collapse all settings icons with localized tooltips and accessible labels. Each section’s state is saved on closing (including Cancel) and restored across app restarts without saving unapplied form edits.
+- `scripts/rebuild-reinstall.sh` stops the current user’s companion, runs the Linux build for the host architecture, reinstalls the generated `.deb` using `sudo apt reinstall -f`, and launches the installed app. A failed stop, build, or installation prevents relaunching.
+
+### Changed
+
+- Updated Avalonia dependencies to 12.1.3 and synchronized application, plugin, widget, and release artifact versions.
+- Redesigned the overlay with QuotaGem-inspired provider headings and compact rounded progress bars containing the usage label, remaining percentage, reset icon, and local reset time.
+- Aligned percentage and reset/status columns across providers. The panel fits its content and selected spacing; weekly credit and automatic reload details appear below the progress bars and remain available in tooltips.
+- Updated dark and light colors and simplified the toolbar styling.
+- The companion now writes to `~/.claude/.credentials.json` when it renews a token. The write is atomic, stays owner-readable only, preserves every field the app does not own, and takes the same lock file the Claude CLI uses so the two never rotate the refresh token at once. Tokens are still never logged.
+- Percentage columns fit their text and configured spacing instead of using a fixed 50/100-pixel width. Changing a gap refits the panel in both directions; ordinary usage refreshes preserve manually resized windows.
+- Default usage cards use 36-pixel bars with additional room for weekly credit details, scale with the font setting, and show resize marks only on hover or focus. Previous untouched 78/96-pixel defaults migrate to compact heights; custom resized layouts are preserved.
+- Refreshed English, Traditional Chinese, and Simplified Chinese overlay, settings, and reset-confirmation screenshots and README instructions.
 
 ### Fixed
 
+- Measure the header and scrolling content directly before the ScrollViewer template is ready, so the initial window fits all visible cards instead of opening at the minimum height. The first display includes every visible card and the status line, with only the normal bottom inset.
+- Progress tracks and fills now resize with their cards for saved sizes, dragging, keyboard resizing, and font changes.
 - Skip Avalonia XAML compilation for the C#-only UI, avoiding an intermittent build-time DLL lock.
 - Restore reliable tray registration by waiting until Avalonia exports the StatusNotifierItem before installing the tooltip bridge.
-- Apply the selected window position at startup and on settings changes through XWayland when available; use the primary monitor bounds for correct placement on mixed-size displays.
+- Apply the selected window position at startup and on settings changes through XWayland when available; use the primary monitor’s working area to avoid reserved desktop panels.
 - Restore the last on-screen position after hiding the window to the tray.
 - Restrict replacement Claude credentials files to owner access during token refresh.
 - Panel positioning now follows its configured screen anchor after provider visibility and content-size changes, including delayed native resize events.
@@ -27,14 +42,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Provider errors are tracked independently: a successful Codex refresh no longer clears an active Claude error. Hiding Claude bars preserves its errors; disabling Claude usage clears them.
 - Removed extra right-side spacing from the settings list.
 - Claude usage no longer stalls at "Waiting for usage data" after a login autostart. The stored OAuth access token expires after a few hours and the Claude CLI renews it only while the CLI itself runs, so following a reboot the companion was reading an expired token and reporting "Claude session expired" until the user happened to open Claude Code. It now renews the token itself through the same OAuth refresh grant the CLI uses, and also retries once when the server rejects a token that has not reached its recorded expiry.
-
-### Changed
-
-- Updated Avalonia dependencies to 12.1.3 and synchronized application, plugin, widget, and release artifact versions.
-- Redesigned the overlay with QuotaGem-inspired provider headings and compact rounded progress bars containing the usage label, remaining percentage, reset icon, and local reset time.
-- Aligned percentage and reset/status columns across providers. The panel fits its content and selected spacing; weekly credit details are available in tooltips.
-- Updated dark and light colors and simplified the toolbar styling.
-- The companion now writes to `~/.claude/.credentials.json` when it renews a token. The write is atomic, stays owner-readable only, preserves every field the app does not own, and takes the same lock file the Claude CLI uses so the two never rotate the refresh token at once. Tokens are still never logged.
+- Saved gap settings and placeholder text are applied before the first display. The panel refits when the first usage result replaces waiting text, so startup respects the 128/16-pixel defaults without reopening Settings; manually resized widths remain preserved.
+- The reset-time column stays at the progress bar’s right edge with a ten-pixel inset when the window is widened, instead of leaving an unused tail.
+- Preset overlay positions use the desktop working area so left-bottom and other anchors avoid reserved taskbars and panels.
 
 ## [0.1.2] - 2026-08-10
 
